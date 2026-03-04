@@ -11,3 +11,6 @@ To build:
 ```bash
 bun pack
 ```
+
+# Todo: Features
+- latex support
