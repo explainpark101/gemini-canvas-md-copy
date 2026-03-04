@@ -35,6 +35,9 @@
             const text = child.textContent;
             markdown += text.replace(/\s+/g, ' ');
           } else if (child.nodeType === 1) {
+            if (child.classList?.contains('export-sheets-button-container')) {
+              return;
+            }
             const tag = child.tagName.toLowerCase();
       
             switch (tag) {
@@ -76,9 +79,13 @@
               case 'sub':
                 markdown += `<sub>${convertNodes(child, '')}</sub>`;
                 break;
-              case 'sup':
-                markdown += `<sup>${convertNodes(child, '')}</sup>`;
+              case 'sup': {
+                const supContent = convertNodes(child, '');
+                if (supContent.trim()) {
+                  markdown += `<sup>${supContent}</sup>`;
+                }
                 break;
+              }
               case 'u':
                 markdown += `<u>${convertNodes(child, '')}</u>`;
                 break;
@@ -379,12 +386,19 @@
         clickTarget = null;
     });
 
+    // 연속된 빈 줄(3개 이상)을 하나의 빈 줄로 정리. \r\n, \r, 공백만 있는 줄 포함
+    function normalizeWhitespace(md) {
+        const normalized = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        return normalized.replace(/(\n[\t ]*){3,}/g, '\n\n');
+    }
+
     // 7. 복사 함수 (GM_setClipboard → navigator.clipboard.writeText)
     async function copyContent() {
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
             const domBody = parseHTML(target.innerHTML);
-            const markdownResult = convertNodes(domBody, '').trim();
+            let markdownResult = convertNodes(domBody, '').trim();
+            markdownResult = normalizeWhitespace(markdownResult);
             try {
                 await navigator.clipboard.writeText(markdownResult);
                 showFeedback('Copied!', copyBtn);
