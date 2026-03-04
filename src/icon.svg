@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+    <defs>
+      <!-- 배경 그라데이션 (Indigo 테마) -->
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6366F1" />
+        <stop offset="100%" stop-color="#312E81" />
+      </linearGradient>
+      
+      <!-- 아이콘 그림자 효과 -->
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.25" />
+      </filter>
+    </defs>
+  
+    <!-- 앱 아이콘 배경 (둥근 사각형) -->
+    <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+  
+    <!-- 중앙 그래픽 그룹 -->
+    <g filter="url(#shadow)" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      
+      <!-- HTML 기호: < > -->
+      <g stroke-width="32">
+        <path d="M 130 216 L 90 256 L 130 296" />
+        <path d="M 170 216 L 210 256 L 170 296" />
+      </g>
+  
+      <!-- 변환 화살표: → -->
+      <g stroke-width="20">
+        <path d="M 240 256 L 280 256" />
+        <path d="M 264 240 L 280 256 L 264 272" />
+      </g>
+  
+      <!-- Markdown 기호: # -->
+      <g stroke-width="32">
+        <path d="M 360 206 L 340 306" />
+        <path d="M 400 206 L 380 306" />
+        <path d="M 320 236 L 416 236" />
+        <path d="M 308 276 L 404 276" />
+      </g>
+      
+    </g>
+  </svg>

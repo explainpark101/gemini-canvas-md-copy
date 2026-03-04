@@ -1,0 +1,16 @@
+{
+  "name": "gemini-canvas-md-copy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pack": "node scripts/pack.js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "archiver": "^7.0.1",
+    "sharp": "^0.33.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

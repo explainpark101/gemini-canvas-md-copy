@@ -1,0 +1,67 @@
+import { createWriteStream, readFileSync, readdirSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { readdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import archiver from 'archiver';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const rootDir = join(__dirname, '..');
+const distDir = join(rootDir, 'dist');
+const srcDir = join(rootDir, 'src');
+const versionsDir = join(rootDir, 'versions');
+
+function copyFilesFromSrcToDist() {
+  if (!existsSync(distDir)) {
+    mkdirSync(distDir, { recursive: true });
+  }
+  const files = readdirSync(srcDir, { withFileTypes: true });
+  for (const file of files) {
+    if (file.isFile()) {
+      copyFileSync(join(srcDir, file.name), join(distDir, file.name));
+    }
+  }
+  console.log('Copied src/ -> dist/');
+}
+
+function getVersion() {
+  const manifestPath = join(distDir, 'manifest.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  return manifest.version || '1.0.0';
+}
+
+async function buildIcons() {
+  await import('./build-icons.js');
+}
+
+async function createZip() {
+  const files = await readdir(distDir, { withFileTypes: true });
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  const output = createWriteStream(zipPath);
+
+  return new Promise((resolve, reject) => {
+    output.on('close', () => {
+      console.log(`Created: ${zipPath} (${(archive.pointer() / 1024).toFixed(1)} KB)`);
+      resolve();
+    });
+    archive.on('error', reject);
+    archive.pipe(output);
+
+    for (const f of files) {
+      const fullPath = join(distDir, f.name);
+      if (f.isFile()) {
+        archive.file(fullPath, { name: f.name });
+      }
+    }
+    archive.finalize();
+  });
+}
+
+copyFilesFromSrcToDist();
+await buildIcons();
+
+const version = getVersion();
+if (!existsSync(versionsDir)) {
+  mkdirSync(versionsDir, { recursive: true });
+}
+const zipPath = join(versionsDir, `gemini-canvas-md-copy-${version}.zip`);
+await createZip();
