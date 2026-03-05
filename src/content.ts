@@ -379,8 +379,32 @@
     }
 
     // **bold** 뒤에 글자가 바로 붙으면 공백 삽입 (마크다운 파싱 버그 방지)
+    // stack으로 여는 ** / 닫는 ** 구분하여, 닫는 ** 직후에만 공백 삽입
     function ensureSpaceAfterBold(md: string): string {
-        return md.replace(/(\*\*[^*]+?\*\*)([가-힣a-zA-Z0-9])/g, '$1 $2');
+        let result = '';
+        let i = 0;
+        let boldDepth = 0; // 0: 밖, 1: bold 안
+
+        while (i < md.length) {
+            if (i + 1 < md.length && md[i] === '*' && md[i + 1] === '*' && (i === 0 || md[i - 1] !== '\\')) {
+                if (boldDepth === 0) {
+                    boldDepth = 1; // 여는 **
+                    result += '**';
+                    i += 2;
+                } else {
+                    boldDepth = 0; // 닫는 **
+                    result += '**';
+                    i += 2;
+                    if (i < md.length && /[가-힣a-zA-Z0-9]/.test(md[i] ?? '')) {
+                        result += ' ';
+                    }
+                }
+            } else {
+                result += md[i] ?? '';
+                i++;
+            }
+        }
+        return result;
     }
 
     // ** 와 bold 내용 사이의 공백 제거 (예: ** Any** -> **Any**)
