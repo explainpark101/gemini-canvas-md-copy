@@ -2,6 +2,7 @@ import { createWriteStream, readFileSync, readdirSync, existsSync, mkdirSync, co
 import { readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
 import archiver from 'archiver';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -10,17 +11,33 @@ const distDir = join(rootDir, 'dist');
 const srcDir = join(rootDir, 'src');
 const versionsDir = join(rootDir, 'versions');
 
+const COPY_EXCLUDE = ['content.ts', 'content.js'];
+
+function buildContentTs() {
+  if (!existsSync(distDir)) {
+    mkdirSync(distDir, { recursive: true });
+  }
+  const result = spawnSync('bun', ['build', join(srcDir, 'content.ts'), '--outdir', distDir, '--minify'], {
+    cwd: rootDir,
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) {
+    throw new Error('bun build failed');
+  }
+  console.log('Built content.ts -> dist/content.js');
+}
+
 function copyFilesFromSrcToDist() {
   if (!existsSync(distDir)) {
     mkdirSync(distDir, { recursive: true });
   }
   const files = readdirSync(srcDir, { withFileTypes: true });
   for (const file of files) {
-    if (file.isFile()) {
+    if (file.isFile() && !COPY_EXCLUDE.includes(file.name)) {
       copyFileSync(join(srcDir, file.name), join(distDir, file.name));
     }
   }
-  console.log('Copied src/ -> dist/');
+  console.log('Copied src/ -> dist/ (excluding content.ts)');
 }
 
 function getVersion() {
@@ -56,6 +73,7 @@ async function createZip() {
   });
 }
 
+buildContentTs();
 copyFilesFromSrcToDist();
 await buildIcons();
 

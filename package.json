@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "bun build src/content.ts --outdir dist",
     "pack": "node scripts/pack.js"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/dom-parser": "^0.1.4",
     "archiver": "^7.0.1",
     "sharp": "^0.33.5"
   },

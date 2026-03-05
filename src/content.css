@@ -1,0 +1,47 @@
+#custom-floating-copy-btn {
+    position: fixed;
+    z-index: 999999;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    display: none;
+    opacity: 0;
+    transform: scale(0.5);
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+
+#custom-floating-copy-btn.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+#custom-floating-copy-btn.visible:active {
+    transform: scale(0.95);
+    transition: transform 0.1s;
+}
+
+#custom-floating-copy-btn button {
+    padding: 10px 20px;
+    width: 150px;
+    background: transparent;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    outline: none;
+}
+
+#custom-floating-copy-btn button:hover {
+    background-color: rgba(255,255,255,0.15);
+}

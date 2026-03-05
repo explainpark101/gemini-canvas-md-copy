@@ -5,41 +5,43 @@
     const TARGET_SELECTOR = ':is(message-content#extended-response-message-content, immersive-editor#extended-response-message-content) .markdown';
 
     // Trusted Types 정책 설정 (보안 정책 우회용)
-    let trustedPolicy;
-    if (typeof trustedTypes !== 'undefined' && trustedTypes.createPolicy) {
+    let trustedPolicy: { createHTML: (s: string) => string };
+    const tt = (globalThis as { trustedTypes?: { createPolicy: (n: string, o: object) => unknown } }).trustedTypes;
+    if (tt?.createPolicy) {
         try {
-            trustedPolicy = trustedTypes.createPolicy('markdown-copy-policy', {
-                createHTML: (string) => string
-            });
-        } catch (e) {
-            trustedPolicy = { createHTML: (string) => string };
+            trustedPolicy = tt.createPolicy('markdown-copy-policy', {
+                createHTML: (s: string) => s
+            }) as { createHTML: (s: string) => string };
+        } catch {
+            trustedPolicy = { createHTML: (s: string) => s };
         }
     } else {
-        trustedPolicy = { createHTML: (string) => string };
+        trustedPolicy = { createHTML: (s: string) => s };
     }
 
     // 1. 문자열을 파싱하여 DOM 객체의 body 반환
-    function parseHTML(htmlString) {
+    function parseHTML(htmlString: string): HTMLElement {
         const parser = new DOMParser();
         const safeHTML = trustedPolicy.createHTML(htmlString);
         const doc = parser.parseFromString(safeHTML, 'text/html');
         return doc.body;
     }
 
-    function convertNodes(node, indent) {
+    function convertNodes(node: Node, indent: string): string {
+      const children = Array.from(node.childNodes);
         let markdown = '';
-        const children = Array.from(node.childNodes);
-      
+
         children.forEach((child) => {
           if (child.nodeType === 3) {
-            const text = child.textContent;
+            const text = child.textContent ?? '';
             markdown += text.replace(/\s+/g, ' ');
           } else if (child.nodeType === 1) {
-            if (child.classList?.contains('export-sheets-button-container')) {
+            const el = child as Element;
+            if (el.classList?.contains('export-sheets-button-container')) {
               return;
             }
-            const tag = child.tagName.toLowerCase();
-      
+            const tag = el.tagName.toLowerCase();
+
             switch (tag) {
               case 'h1':
                 markdown += `\n# ${convertNodes(child, '')}\n`;
@@ -59,9 +61,18 @@
               case 'h6':
                 markdown += `\n###### ${convertNodes(child, '')}\n`;
                 break;
-              case 'p':
-                markdown += `\n${convertNodes(child, '')}\n`;
+              case 'p': {
+                const pContent = convertNodes(child, '');
+                const parent = el.parentNode as Element | null;
+                const isLiFirstChildP = parent?.tagName?.toLowerCase() === 'li' && parent?.firstElementChild === el;
+                const isFirstChildStrong = el.firstElementChild?.tagName?.toLowerCase() === 'strong';
+                if (isLiFirstChildP && isFirstChildStrong) {
+                  markdown += pContent.trimStart();
+                } else {
+                  markdown += `\n${pContent}\n`;
+                }
                 break;
+              }
               case 'br':
                 markdown += '\n';
                 break;
@@ -99,27 +110,31 @@
                 markdown += `<small>${convertNodes(child, '')}</small>`;
                 break;
               case 'abbr': {
-                const title = (child.getAttribute('title') || '').replace(/"/g, '&quot;');
+                const title = (el.getAttribute('title') || '').replace(/"/g, '&quot;');
                 markdown += title ? `<abbr title="${title}">${convertNodes(child, '')}</abbr>` : convertNodes(child, '');
                 break;
               }
               case 'input':
                 break;
               case 'strong':
-              case 'b':
-                markdown += `**${convertNodes(child, '')}**`;
+              case 'b': {
+                let strongContent = convertNodes(child, '');
+                markdown += `**${strongContent.trim()}**`;
                 break;
+              }
               case 'em':
               case 'i':
                 markdown += `*${convertNodes(child, '')}*`;
                 break;
-              case 'code':
-                if (child.parentNode.tagName.toLowerCase() === 'pre') {
-                  markdown += convertNodes(child, '');
+              case 'code': {
+                const codeText = (el.textContent ?? '').replace(/\\n/g, '\n');
+                if ((el.parentNode as Element)?.tagName?.toLowerCase() === 'pre') {
+                  markdown += codeText;
                 } else {
-                  markdown += ` \`${convertNodes(child, '')}\` `;
+                  markdown += ` \`${codeText}\` `;
                 }
                 break;
+              }
               case 'pre':
                 markdown += `\n\`\`\`\n${convertNodes(child, '')}\n\`\`\`\n`;
                 break;
@@ -131,15 +146,15 @@
                 markdown += `\n${convertNodes(child, indent)}\n`;
                 break;
               case 'li': {
-                const checkbox = child.querySelector('input[type="checkbox"]');
+                const checkbox = el.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
                 if (checkbox) {
                   const checkPrefix = checkbox.checked ? '[x] ' : '[ ] ';
-                  const clone = child.cloneNode(true);
+                  const clone = el.cloneNode(true) as Element;
                   clone.querySelector('input[type="checkbox"]')?.remove();
                   const content = convertNodes(clone, indent + '  ').trim();
                   markdown += `${indent}- ${checkPrefix}${content}\n`;
                 } else {
-                  const prefix = child.parentNode.tagName.toLowerCase() === 'ol' ? '1. ' : '- ';
+                  const prefix = (el.parentNode as Element)?.tagName?.toLowerCase() === 'ol' ? '1. ' : '- ';
                   markdown += `${indent}${prefix}${convertNodes(child, indent + '  ')}\n`;
                 }
                 break;
@@ -154,13 +169,13 @@
                 markdown += `${indent}:   ${convertNodes(child, '').trim().replace(/\n/g, '\n    ')}\n`;
                 break;
               case 'a':
-                markdown += `[${convertNodes(child, '')}](${child.getAttribute('href') || ''})`;
+                markdown += `[${convertNodes(child, '')}](${el.getAttribute('href') || ''})`;
                 break;
               case 'img':
-                markdown += `![${child.getAttribute('alt') || ''}](${child.getAttribute('src') || ''})`;
+                markdown += `![${el.getAttribute('alt') || ''}](${el.getAttribute('src') || ''})`;
                 break;
               case 'table':
-                markdown += `\n\n${processTable(child)}\n`;
+                markdown += `\n\n${processTable(el)}\n`;
                 break;
               case 'div':
                 markdown += `\n${convertNodes(child, indent)}\n`;
@@ -179,11 +194,11 @@
                 markdown += `\`${convertNodes(child, '')}\``;
                 break;
               case 'details': {
-                const summary = child.querySelector('summary');
+                const summary = el.querySelector('summary');
                 const summaryText = summary ? convertNodes(summary, '') : 'Details';
-                const content = Array.from(child.childNodes)
+                const content = Array.from(el.childNodes)
                   .filter((n) => n !== summary)
-                  .map((n) => (n.nodeType === 1 ? convertNodes(n, indent) : n.textContent))
+                  .map((n) => (n.nodeType === 1 ? convertNodes(n, indent) : (n.textContent ?? '')))
                   .join('');
                 markdown += `\n<details>\n<summary>${summaryText}</summary>\n\n${content.trim()}\n</details>\n`;
                 break;
@@ -207,7 +222,7 @@
                 markdown += `\n${convertNodes(child, indent)}\n`;
                 break;
               case 'math-inline': {
-                const inlineLatex = child.getAttribute('data-math') || '';
+                const inlineLatex = el.getAttribute('data-math') || '';
                 if (inlineLatex.trim()) {
                   markdown += `$${inlineLatex}$`;
                 }
@@ -215,7 +230,7 @@
               }
               case 'math-block':
               case 'math-display': {
-                const blockLatex = child.getAttribute('data-math') || '';
+                const blockLatex = el.getAttribute('data-math') || '';
                 if (blockLatex.trim()) {
                   markdown += `\n$$\n${blockLatex}\n$$\n`;
                 }
@@ -226,19 +241,22 @@
             }
           }
         });
-      
+
         return markdown;
     }
 
-    function processTable(table) {
-        const rows = [];
+    function processTable(table: Element): string {
+        const rows: string[][] = [];
         const thead = table.querySelector('thead');
         const tbody = table.querySelector('tbody') || table;
-        const trs = [...(thead ? thead.querySelectorAll('tr') : []), ...tbody.querySelectorAll('tr')];
+        const trs = [
+            ...(thead ? Array.from(thead.querySelectorAll('tr')) : []),
+            ...Array.from(tbody.querySelectorAll('tr')),
+        ];
 
         trs.forEach((tr) => {
-            const cells = [];
-            tr.querySelectorAll('th, td').forEach((cell) => {
+            const cells: string[] = [];
+            tr.querySelectorAll('th, td').forEach((cell: Element) => {
                 cells.push(convertNodes(cell, '').trim().replace(/\n/g, ' '));
             });
             if (cells.length) rows.push(cells);
@@ -247,72 +265,24 @@
         if (rows.length === 0) return '';
 
         const colCount = Math.max(...rows.map((r) => r.length));
-        const pad = (arr) => {
+        const pad = (arr: string[]) => {
             const a = [...arr];
             while (a.length < colCount) a.push('');
             return a;
         };
 
-        const toRow = (arr) => '| ' + pad(arr).join(' | ') + ' |';
+        const toRow = (arr: string[]) => '| ' + pad(arr).join(' | ') + ' |';
         const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
 
-        let md = '\n' + toRow(rows[0]) + '\n' + sep;
+        const firstRow = rows[0]!;
+        let md = '\n' + toRow(firstRow) + '\n' + sep;
         for (let i = 1; i < rows.length; i++) {
-            md += '\n' + toRow(rows[i]);
+            md += '\n' + toRow(rows[i]!);
         }
         return md + '\n';
     }
 
-    // 3. 스타일 주입 (GM_addStyle 대체)
-    const style = document.createElement('style');
-    style.textContent = `
-        #custom-floating-copy-btn {
-            position: fixed;
-            z-index: 999999;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            touch-action: none;
-            display: none;
-            opacity: 0;
-            transform: scale(0.5);
-            pointer-events: none;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            overflow: hidden;
-        }
-        #custom-floating-copy-btn.visible {
-            opacity: 1;
-            transform: scale(1);
-            pointer-events: auto;
-        }
-        #custom-floating-copy-btn.visible:active {
-            transform: scale(0.95);
-            transition: transform 0.1s;
-        }
-        #custom-floating-copy-btn button {
-            padding: 10px 20px;
-            width: 150px;
-            background: transparent;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            outline: none;
-        }
-        #custom-floating-copy-btn button:hover {
-            background-color: rgba(255,255,255,0.15);
-        }
-    `;
-    document.head.appendChild(style);
-
-    // 4. 버튼 요소 생성
+    // 3. 버튼 요소 생성
     const btn = document.createElement('div');
     btn.id = 'custom-floating-copy-btn';
 
@@ -321,30 +291,30 @@
 
     btn.appendChild(copyBtn);
 
-    // 5. 로컬 스토리지에서 초기 위치 불러오기
+    // 4. 로컬 스토리지에서 초기 위치 불러오기
     const savedX = localStorage.getItem('floatingBtnX') || '5vw';
     const savedY = localStorage.getItem('floatingBtnY') || '90vh';
     btn.style.left = savedX;
     btn.style.top = savedY;
     document.body.appendChild(btn);
 
-    // 6. 드래그 및 클릭 로직
+    // 5. 드래그 및 클릭 로직
     let isDragging = false;
     let isLongPress = false;
-    let longPressTimer;
-    let startX, startY;
-    let initialLeft, initialTop;
+    let longPressTimer: ReturnType<typeof setTimeout>;
+    let startX: number, startY: number;
+    let initialLeft: number, initialTop: number;
     let isButtonActive = false;
-    let clickTarget = null;
+    let clickTarget: Element | null = null;
 
-    btn.addEventListener('pointerdown', (e) => {
+    btn.addEventListener('pointerdown', (e: PointerEvent) => {
         if (!isButtonActive) return;
 
         isDragging = false;
         isLongPress = false;
         startX = e.clientX;
         startY = e.clientY;
-        clickTarget = e.target.closest('button');
+        clickTarget = (e.target as Element).closest('button');
 
         const rect = btn.getBoundingClientRect();
         initialLeft = e.clientX - rect.left;
@@ -360,7 +330,7 @@
         btn.setPointerCapture(e.pointerId);
     });
 
-    btn.addEventListener('pointermove', (e) => {
+    btn.addEventListener('pointermove', (e: PointerEvent) => {
         if (!isButtonActive) return;
 
         if (!isLongPress) {
@@ -382,7 +352,7 @@
         btn.style.top = `${vh}vh`;
     });
 
-    btn.addEventListener('pointerup', (e) => {
+    btn.addEventListener('pointerup', (e: PointerEvent) => {
         if (!isButtonActive) return;
 
         clearTimeout(longPressTimer);
@@ -403,18 +373,36 @@
     });
 
     // 연속된 빈 줄(3개 이상)을 하나의 빈 줄로 정리. \r\n, \r, 공백만 있는 줄 포함
-    function normalizeWhitespace(md) {
+    function normalizeWhitespace(md: string): string {
         const normalized = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         return normalized.replace(/(\n[\t ]*){3,}/g, '\n\n');
     }
 
-    // 7. 복사 함수 (GM_setClipboard → navigator.clipboard.writeText)
-    async function copyContent() {
+    // **bold** 뒤에 글자가 바로 붙으면 공백 삽입 (마크다운 파싱 버그 방지)
+    function ensureSpaceAfterBold(md: string): string {
+        return md.replace(/(\*\*[^*]+?\*\*)([가-힣a-zA-Z0-9])/g, '$1 $2');
+    }
+
+    // ** 와 bold 내용 사이의 공백 제거 (예: ** Any** -> **Any**)
+    function trimBoldContent(md: string): string {
+        return md.replace(/\*\* +([^*]+?)\*\*/g, '**$1**');
+    }
+
+    // 2칸 이상 연속 공백을 1칸으로
+    function collapseSpaces(md: string): string {
+        return md.replace(/[ \t]{2,}/g, ' ');
+    }
+
+    // 6. 복사 함수 (GM_setClipboard → navigator.clipboard.writeText)
+    async function copyContent(): Promise<void> {
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
             const domBody = parseHTML(target.innerHTML);
             let markdownResult = convertNodes(domBody, '').trim();
             markdownResult = normalizeWhitespace(markdownResult);
+            markdownResult = trimBoldContent(markdownResult);
+            markdownResult = collapseSpaces(markdownResult);
+            markdownResult = ensureSpaceAfterBold(markdownResult);
             try {
                 await navigator.clipboard.writeText(markdownResult);
                 showFeedback('Copied!', copyBtn);
@@ -426,8 +414,8 @@
         }
     }
 
-    // 8. 시각적 피드백
-    function showFeedback(msg, btnElement = copyBtn) {
+    // 7. 시각적 피드백
+    function showFeedback(msg: string, btnElement: HTMLButtonElement = copyBtn): void {
         const originalText = btnElement.innerText;
         btnElement.innerText = msg;
         setTimeout(() => {
@@ -435,9 +423,9 @@
         }, 1500);
     }
 
-    // 9. Observer를 통한 동적 표시 및 애니메이션 로직
-    let hideTimeout;
-    function toggleButtonVisibility() {
+    // 8. Observer를 통한 동적 표시 및 애니메이션 로직
+    let hideTimeout: ReturnType<typeof setTimeout>;
+    function toggleButtonVisibility(): void {
         const targetExists = document.querySelector(TARGET_SELECTOR) !== null;
 
         if (targetExists && !isButtonActive) {
