@@ -206,6 +206,21 @@
               case 'aside':
                 markdown += `\n${convertNodes(child, indent)}\n`;
                 break;
+              case 'math-inline': {
+                const inlineLatex = child.getAttribute('data-math') || '';
+                if (inlineLatex.trim()) {
+                  markdown += `$${inlineLatex}$`;
+                }
+                break;
+              }
+              case 'math-block':
+              case 'math-display': {
+                const blockLatex = child.getAttribute('data-math') || '';
+                if (blockLatex.trim()) {
+                  markdown += `\n$$\n${blockLatex}\n$$\n`;
+                }
+                break;
+              }
               default:
                 markdown += convertNodes(child, indent);
             }
@@ -282,6 +297,7 @@
         }
         #custom-floating-copy-btn button {
             padding: 10px 20px;
+            width: 150px;
             background: transparent;
             color: white;
             border: none;

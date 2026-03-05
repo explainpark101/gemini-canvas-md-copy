@@ -12,5 +12,5 @@ To build:
 bun pack
 ```
 
-# Todo: Features
-- latex support
+# Added Features
+- KaTeX / LaTeX support (math-inline, math-block) — `data-math` → `$...$` / `$$...$$`
