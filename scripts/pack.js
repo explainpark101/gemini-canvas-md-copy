@@ -11,20 +11,27 @@ const distDir = join(rootDir, 'dist');
 const srcDir = join(rootDir, 'src');
 const versionsDir = join(rootDir, 'versions');
 
-const COPY_EXCLUDE = ['content.ts', 'content.js'];
+const COPY_EXCLUDE = ['content.ts', 'content.js', 'context-menu-handler.ts', 'context-menu-handler.js', 'background.ts', 'background.js', 'html-to-markdown.ts'];
 
-function buildContentTs() {
+function buildScripts() {
   if (!existsSync(distDir)) {
     mkdirSync(distDir, { recursive: true });
   }
-  const result = spawnSync('bun', ['build', join(srcDir, 'content.ts'), '--outdir', distDir, '--minify'], {
-    cwd: rootDir,
-    stdio: 'inherit',
-  });
-  if (result.status !== 0) {
-    throw new Error('bun build failed');
+  const scripts = [
+    ['content.ts', 'content.js'],
+    ['context-menu-handler.ts', 'context-menu-handler.js'],
+    ['background.ts', 'background.js'],
+  ];
+  for (const [src, out] of scripts) {
+    const result = spawnSync('bun', ['build', join(srcDir, src), '--outdir', distDir, '--minify'], {
+      cwd: rootDir,
+      stdio: 'inherit',
+    });
+    if (result.status !== 0) {
+      throw new Error(`bun build failed: ${src}`);
+    }
+    console.log(`Built ${src} -> dist/${out}`);
   }
-  console.log('Built content.ts -> dist/content.js');
 }
 
 function copyFilesFromSrcToDist() {
@@ -73,7 +80,7 @@ async function createZip() {
   });
 }
 
-buildContentTs();
+buildScripts();
 copyFilesFromSrcToDist();
 await buildIcons();
 
