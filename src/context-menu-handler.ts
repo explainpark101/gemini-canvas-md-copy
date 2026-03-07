@@ -3,6 +3,36 @@
  */
 import { htmlToMarkdown } from './html-to-markdown.ts';
 
+/** 선택 영역 HTML을 읽을 수 있는지 검사 (canvas, shadow DOM 등 비읽기 영역 제외) */
+function isSelectionReadable(): boolean {
+  try {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    const container = document.createElement('div');
+    container.appendChild(range.cloneContents());
+    const html = container.innerHTML;
+    return html.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function notifySelectionReadable(readable: boolean): void {
+  chrome.runtime.sendMessage({ selectionReadable: readable });
+}
+
+let selectionDebounceTimer: ReturnType<typeof setTimeout>;
+function onSelectionChange(): void {
+  clearTimeout(selectionDebounceTimer);
+  selectionDebounceTimer = setTimeout(() => {
+    notifySelectionReadable(isSelectionReadable());
+  }, 50);
+}
+
+document.addEventListener('selectionchange', onSelectionChange, { passive: true });
+onSelectionChange();
+
 function showCopyFeedback(): void {
   const toast = document.createElement('div');
   toast.textContent = 'Copied as Markdown!';
