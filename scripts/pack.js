@@ -23,7 +23,7 @@ function buildScripts() {
     ['background.ts', 'background.js'],
   ];
   for (const [src, out] of scripts) {
-    const result = spawnSync('bun', ['build', join(srcDir, src), '--outdir', distDir, '--minify'], {
+    const result = spawnSync('bun', ['build', join(srcDir, src), '--outdir', distDir], {
       cwd: rootDir,
       stdio: 'inherit',
     });
