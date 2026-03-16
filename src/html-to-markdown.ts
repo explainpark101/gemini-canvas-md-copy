@@ -220,16 +220,18 @@ function convertNodes(node: Node, indent: string): string {
           markdown += `\n${convertNodes(child, indent)}\n`;
           break;
         case 'math-inline': {
-          const inlineLatex = el.getAttribute('data-math') || '';
+          let inlineLatex = el.getAttribute('data-math') || '';
           if (inlineLatex.trim()) {
+            inlineLatex = inlineLatex.replace(/([가-힣ㄱ-ㅎ]) ([가-힣ㄱ-ㅎ])/g, '$1\\ $2');
             markdown += `$${inlineLatex}$`;
           }
           break;
         }
         case 'math-block':
         case 'math-display': {
-          const blockLatex = el.getAttribute('data-math') || '';
+          let blockLatex = el.getAttribute('data-math') || '';
           if (blockLatex.trim()) {
+            blockLatex = blockLatex.replace(/([가-힣ㄱ-ㅎ]) ([가-힣ㄱ-ㅎ])/g, '$1\\ $2');
             markdown += `\n$$\n${blockLatex}\n$$\n`;
           }
           break;
