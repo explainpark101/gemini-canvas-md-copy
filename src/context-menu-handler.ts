@@ -77,6 +77,14 @@ chrome.runtime.onMessage.addListener(
         const container = document.createElement('div');
         container.appendChild(range.cloneContents());
 
+        // 선택 영역의 마지막 엘리먼트가 눈에 보이는 텍스트를 가지지 않는 경우 제거
+        let lastEl = container.lastElementChild;
+        while (lastEl && (lastEl.textContent ?? '').trim() === '') {
+          const prev = lastEl.previousElementSibling;
+          lastEl.remove();
+          lastEl = prev;
+        }
+
         const html = container.innerHTML;
         if (!html.trim()) {
           sendResponse({ success: false, error: 'empty_selection' });

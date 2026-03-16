@@ -62,11 +62,17 @@ function convertNodes(node: Node, indent: string): string {
         case 'p': {
           const pContent = convertNodes(child, '');
           const parent = el.parentNode as Element | null;
-          const isLiFirstChildP = parent?.tagName?.toLowerCase() === 'li' && parent?.firstElementChild === el;
+          const isLi = parent?.tagName?.toLowerCase() === 'li';
+          const isLiFirstChildP = isLi && parent?.firstElementChild === el;
           const isFirstChildStrong = el.firstElementChild?.tagName?.toLowerCase() === 'strong';
           if (isLiFirstChildP && isFirstChildStrong) {
+            // li > p > strong* 의 경우: 리스트 마커 바로 뒤에 붙도록 앞 개행/공백 제거
             markdown += pContent.trimStart();
+          } else if (isLi) {
+            // 일반적인 li > p 의 경우: 앞 개행 없이 내용만 추가
+            markdown += `${pContent}\n`;
           } else {
+            // 그 외 p는 블록 단위로 개행
             markdown += `\n${pContent}\n`;
           }
           break;
@@ -321,9 +327,50 @@ function trimBoldContent(md: string): string {
   return md.replace(/\*\* +([^*]+?)\*\*/g, '**$1**');
 }
 
-/** 2칸 이상 연속 공백을 1칸으로 */
+/** 2칸 이상 연속 공백을 1칸으로 (라인 선두의 들여쓰기는 유지) */
 function collapseSpaces(md: string): string {
-  return md.replace(/[ \t]{2,}/g, ' ');
+  return md
+    .split('\n')
+    .map((line) => {
+      const match = line.match(/^([ \t]*)(.*)$/);
+      if (!match) return line;
+      const [, leading, rest] = match;
+      return leading + (rest?.replace(/[ \t]{2,}/g, ' ') ?? '');
+    })
+    .join('\n');
+}
+
+/** 동일 리스트(ul/ol) 내에서 연속된 li 사이의 이중 개행을 단일 개행으로 정리 */
+function collapseBlankLinesBetweenListItems(md: string): string {
+  const lines = md.split('\n');
+  const isListItemLine = (line: string): boolean =>
+    /^[ \t]*([-*+] |\d+\. )/.test(line);
+
+  const result: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const next = lines[i + 1];
+    const next2 = lines[i + 2];
+
+    // 현재 줄이 li, 다음 줄이 완전 빈 줄, 다다음 줄이 li 인 경우
+    // (즉, :is(ul, ol) > li + li 사이에 끼어 있는 빈 줄 하나 제거)
+    if (
+      isListItemLine(line) &&
+      next !== undefined &&
+      next.trim() === '' &&
+      next2 !== undefined &&
+      isListItemLine(next2)
+    ) {
+      result.push(line);
+      // 빈 줄(next)은 건너뛰고, 다음 반복에서 next2를 처리
+      i += 1;
+      continue;
+    }
+
+    result.push(line);
+  }
+
+  return result.join('\n');
 }
 
 /**
@@ -333,6 +380,7 @@ export function htmlToMarkdown(html: string): string {
   const domBody = parseHTML(html);
   let markdown = convertNodes(domBody, '').trim();
   markdown = normalizeWhitespace(markdown);
+  markdown = collapseBlankLinesBetweenListItems(markdown);
   markdown = trimBoldContent(markdown);
   markdown = collapseSpaces(markdown);
   markdown = ensureSpaceAfterBold(markdown);
