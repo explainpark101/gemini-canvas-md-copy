@@ -35,6 +35,50 @@ interface MdNode {
 /** Gemini 출처 캐러셀 등 마크다운에 포함하지 않을 커스텀 엘리먼트 */
 const SKIP_ELEMENT_TAGS = new Set(['sources-carousel-inline', 'source-inline-chip']);
 
+function collectTrNodes(table: MdNode): MdNode[] {
+  const out: MdNode[] = [];
+  function walk(x: MdNode): void {
+    if (x.type === 'tr') {
+      out.push(x);
+      return;
+    }
+    for (const c of x.children) walk(c);
+  }
+  walk(table);
+  return out;
+}
+
+function renderMarkdownTable(table: MdNode): string {
+  const rows = collectTrNodes(table);
+  if (rows.length === 0) return '';
+
+  const cellLines = rows.map((row) => {
+    const cells = row.children.filter((c) => c.type === 'th' || c.type === 'td');
+    return cells.map((cell) => {
+      const text = renderMdTree(cell, 0, null, true).replace(/\n/g, ' ').trim();
+      return text.replace(/\|/g, '\\|');
+    });
+  });
+
+  const colCount = Math.max(...cellLines.map((r) => r.length), 0);
+  if (colCount === 0) return '';
+
+  const pad = (arr: string[]) => {
+    const a = [...arr];
+    while (a.length < colCount) a.push('');
+    return a;
+  };
+
+  const toRow = (arr: string[]) => '| ' + pad(arr).join(' | ') + ' |';
+  const sep = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
+
+  let md = '\n' + toRow(cellLines[0]!) + '\n' + sep;
+  for (let i = 1; i < cellLines.length; i++) {
+    md += '\n' + toRow(cellLines[i]!);
+  }
+  return md + '\n';
+}
+
 function parseHtmlToMarkdownBfs(htmlString: string): string {
   const body = parseHTML(htmlString);
 
@@ -66,6 +110,11 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
             newMdNode.attributes[attr.name] = attr.value;
           }
         }
+        if (type === 'code') {
+          let t = (el as HTMLElement).textContent ?? '';
+          t = t.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
+          newMdNode.attributes['__codeText__'] = t;
+        }
       }
 
       mdNode.children.push(newMdNode);
@@ -76,13 +125,35 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
   return renderMdTree(mdRoot).replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function renderMdTree(node: MdNode, depth = 0): string {
+function renderMdTree(node: MdNode, depth = 0, parentType: string | null = null, inTableCell = false): string {
   if (node.type === '#text') {
+    if (parentType === 'pre') {
+      return node.text.replace(/\r\n/g, '\n');
+    }
     return node.text.replace(/\s+/g, ' ');
   }
 
+  if (node.type === 'table') {
+    return renderMarkdownTable(node);
+  }
+
+  if (node.type === 'code') {
+    let raw = node.attributes['__codeText__'];
+    if (raw === undefined) {
+      raw = node.children.map((c) => renderMdTree(c, depth, 'code', inTableCell)).join('');
+    } else {
+      raw = raw.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
+    }
+    if (parentType === 'pre') {
+      return raw;
+    }
+    const escaped = raw.replace(/`/g, '\\`');
+    return `\`${escaped}\``;
+  }
+
   const nextDepth = node.type === 'li' ? depth + 1 : depth;
-  const childContent = node.children.map((child) => renderMdTree(child, nextDepth)).join('');
+  const passTableCell = inTableCell || node.type === 'th' || node.type === 'td';
+  const childContent = node.children.map((child) => renderMdTree(child, nextDepth, node.type, passTableCell)).join('');
 
   switch (node.type) {
     case 'h1':
@@ -94,6 +165,9 @@ function renderMdTree(node: MdNode, depth = 0): string {
     case 'h4':
       return `\n#### ${childContent}\n\n`;
     case 'p':
+      if (inTableCell) {
+        return childContent.trim();
+      }
       return `\n${childContent}\n\n`;
     case 'strong':
     case 'b':
@@ -127,11 +201,12 @@ function renderMdTree(node: MdNode, depth = 0): string {
       return `${formatted}\n`;
     }
     case 'br':
-      return `\n`;
-    case 'code':
-      return `\`${childContent.trim()}\``;
+      return inTableCell ? ' ' : `\n`;
     case 'pre':
       return `\n\`\`\`\n${childContent}\n\`\`\`\n`;
+    case 'th':
+    case 'td':
+      return childContent.trim();
     case 'math-inline': {
       let inlineLatex = node.attributes['data-math'] || '';
       if (inlineLatex.trim()) {
@@ -160,9 +235,9 @@ function renderMdTree(node: MdNode, depth = 0): string {
  * HTML 문자열을 Markdown으로 변환
  */
 export function htmlToMarkdown(html: string): string {
-  const node = new DOMParser().parseFromString(html, 'text/html').body;
-  node.querySelectorAll(`${Array.from(SKIP_ELEMENT_TAGS).join(',')}`).forEach((el) => {
+  const body = parseHTML(html);
+  body.querySelectorAll(Array.from(SKIP_ELEMENT_TAGS).join(',')).forEach((el) => {
     el.remove();
   });
-  return parseHtmlToMarkdownBfs(node.innerHTML);
+  return parseHtmlToMarkdownBfs(body.innerHTML);
 }
