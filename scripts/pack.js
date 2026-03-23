@@ -11,7 +11,7 @@ const distDir = join(rootDir, 'dist');
 const srcDir = join(rootDir, 'src');
 const versionsDir = join(rootDir, 'versions');
 
-const COPY_EXCLUDE = ['content.ts', 'content.js', 'context-menu-handler.ts', 'context-menu-handler.js', 'background.ts', 'background.js', 'html-to-markdown.ts'];
+const COPY_EXCLUDE = ['content.ts', 'content.js', 'context-menu-handler.ts', 'context-menu-handler.js', 'background.ts', 'background.js', 'html-to-markdown.ts', 'html2md.jsx'];
 
 function buildScripts() {
   if (!existsSync(distDir)) {
