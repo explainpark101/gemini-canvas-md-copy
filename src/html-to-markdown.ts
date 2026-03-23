@@ -32,6 +32,9 @@ interface MdNode {
   attributes: Record<string, string>;
 }
 
+/** Gemini 출처 캐러셀 등 마크다운에 포함하지 않을 커스텀 엘리먼트 */
+const SKIP_ELEMENT_TAGS = new Set(['sources-carousel-inline', 'source-inline-chip']);
+
 function parseHtmlToMarkdownBfs(htmlString: string): string {
   const body = parseHTML(htmlString);
 
@@ -45,6 +48,9 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
 
     domNode.childNodes.forEach((child) => {
       const type = child.nodeName.toLowerCase();
+      if (child.nodeType === Node.ELEMENT_NODE && SKIP_ELEMENT_TAGS.has(type)) {
+        return;
+      }
       const newMdNode: MdNode = {
         type,
         children: [],
@@ -154,5 +160,9 @@ function renderMdTree(node: MdNode, depth = 0): string {
  * HTML 문자열을 Markdown으로 변환
  */
 export function htmlToMarkdown(html: string): string {
-  return parseHtmlToMarkdownBfs(html);
+  const node = new DOMParser().parseFromString(html, 'text/html').body;
+  node.querySelectorAll(`${Array.from(SKIP_ELEMENT_TAGS).join(',')}`).forEach((el) => {
+    el.remove();
+  });
+  return parseHtmlToMarkdownBfs(node.innerHTML);
 }
