@@ -35,6 +35,42 @@ interface MdNode {
 /** Gemini 출처 캐러셀 등 마크다운에 포함하지 않을 커스텀 엘리먼트 */
 const SKIP_ELEMENT_TAGS = new Set(['sources-carousel-inline', 'source-inline-chip']);
 
+/**
+ * Gemini 캔버스 등은 `<math-block>` 대신 `<div class="math-block" data-math="...">` 형태를 씀.
+ * 인라인은 `<span class="math-inline" data-math="...">` + 내부 `.katex` 조합이 흔함.
+ * 태그명만 보면 수식이 `div`/`span`으로만 잡혀 KaTeX HTML만 풀리므로 class·data-math·annotation으로 정규화한다.
+ */
+function normalizeMathElementType(tag: string, node: Node): string {
+  if (tag === 'math-block' || tag === 'math-inline' || tag === 'math-display') {
+    return tag;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return tag;
+  const el = node as Element;
+  if (el.classList.contains('math-block')) return 'math-block';
+  if (el.classList.contains('math-display')) return 'math-display';
+  if (el.classList.contains('math-inline')) return 'math-inline';
+  const dataMath = (el.getAttribute('data-math') || '').trim();
+  if (dataMath) {
+    if (tag === 'span') return 'math-inline';
+    if (tag === 'div') return 'math-block';
+  }
+  return tag;
+}
+
+/** `data-math`가 없을 때 KaTeX MathML annotation에서 LaTeX 소스를 복구 */
+function augmentKatexFromAnnotation(el: Element, mdNode: MdNode): void {
+  if ((mdNode.attributes['data-math'] || '').trim()) return;
+  if (!el.classList.contains('katex')) return;
+  const ann = el.querySelector('annotation[encoding="application/x-tex"]');
+  const tex = ann?.textContent?.trim();
+  if (!tex) return;
+  mdNode.attributes['data-math'] = tex;
+  const isDisplay =
+    el.classList.contains('katex-display') ||
+    Boolean(el.parentElement?.classList.contains('katex-display'));
+  mdNode.type = isDisplay ? 'math-display' : 'math-inline';
+}
+
 function collectTrNodes(table: MdNode): MdNode[] {
   const out: MdNode[] = [];
   function walk(x: MdNode): void {
@@ -91,12 +127,12 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
     const { domNode, mdNode } = item;
 
     domNode.childNodes.forEach((child) => {
-      const type = child.nodeName.toLowerCase();
-      if (child.nodeType === Node.ELEMENT_NODE && SKIP_ELEMENT_TAGS.has(type)) {
+      const rawTag = child.nodeName.toLowerCase();
+      if (child.nodeType === Node.ELEMENT_NODE && SKIP_ELEMENT_TAGS.has(rawTag)) {
         return;
       }
       const newMdNode: MdNode = {
-        type,
+        type: rawTag,
         children: [],
         text: child.nodeValue || '',
         attributes: {},
@@ -110,15 +146,25 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
             newMdNode.attributes[attr.name] = attr.value;
           }
         }
-        if (type === 'code') {
+        if (rawTag === 'code') {
           let t = (el as HTMLElement).textContent ?? '';
           t = t.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
           newMdNode.attributes['__codeText__'] = t;
         }
+        newMdNode.type = normalizeMathElementType(rawTag, child);
+        augmentKatexFromAnnotation(el, newMdNode);
       }
 
       mdNode.children.push(newMdNode);
-      queue.push({ domNode: child, mdNode: newMdNode });
+      const mathFromAttr = (newMdNode.attributes['data-math'] || '').trim();
+      const skipMathChildren =
+        mathFromAttr &&
+        (newMdNode.type === 'math-block' ||
+          newMdNode.type === 'math-display' ||
+          newMdNode.type === 'math-inline');
+      if (!skipMathChildren) {
+        queue.push({ domNode: child, mdNode: newMdNode });
+      }
     });
   }
 
