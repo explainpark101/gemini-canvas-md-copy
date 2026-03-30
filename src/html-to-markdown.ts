@@ -32,8 +32,64 @@ interface MdNode {
   attributes: Record<string, string>;
 }
 
-/** Gemini 출처 캐러셀 등 마크다운에 포함하지 않을 커스텀 엘리먼트 */
-const SKIP_ELEMENT_TAGS = new Set(['sources-carousel-inline', 'source-inline-chip']);
+/** Gemini 출처 캐러셀·각주 등 마크다운에 포함하지 않을 커스텀 엘리먼트 */
+const SKIP_ELEMENT_TAGS = new Set([
+  'sources-carousel-inline',
+  'source-inline-chip',
+  'source-footnote',
+]);
+
+/** 태그 외에 class로만 표시되는 출처 UI 래퍼 (선택 복사 시 부모 태그가 잘려도 남는 경우 대비) */
+const SKIP_ELEMENT_CLASS_NAMES = new Set(['source-inline-chip', 'source-inline-chip-container']);
+
+/** 출처 칩 라벨(+N 등): 선택 영역 복사 시 커스텀 태그가 깨져도 이 속성이 있으면 스킵 */
+const SKIP_IF_HAS_ATTRIBUTE = 'hide-from-message-actions';
+
+function shouldSkipDomElement(node: Node): boolean {
+  if (node.nodeType !== Node.ELEMENT_NODE) return false;
+  const el = node as Element;
+  const tag = el.nodeName.toLowerCase();
+  if (SKIP_ELEMENT_TAGS.has(tag)) return true;
+  if (el.hasAttribute(SKIP_IF_HAS_ATTRIBUTE)) return true;
+  for (const cls of SKIP_ELEMENT_CLASS_NAMES) {
+    if (el.classList.contains(cls)) return true;
+  }
+  return false;
+}
+
+/** htmlToMarkdown 전처리용: 태그·클래스·속성 셀렉터로 한 번에 제거 */
+function skipElementRemovalSelector(): string {
+  const parts = [
+    ...SKIP_ELEMENT_TAGS,
+    ...[...SKIP_ELEMENT_CLASS_NAMES].map((c) => `.${CSS.escape(c)}`),
+    `[${SKIP_IF_HAS_ATTRIBUTE}]`,
+  ];
+  return parts.join(',');
+}
+
+/**
+ * 선택 복사(cloneContents) 등으로 커스텀 태그가 없어지고 `+2` 같은 텍스트만 남는 경우 제거
+ */
+function stripOrphanSourceCountTextNodes(root: HTMLElement): void {
+  const doc = root.ownerDocument;
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const toRemove: Text[] = [];
+  let n: Node | null = walker.nextNode();
+  while (n) {
+    const t = n as Text;
+    const raw = t.nodeValue ?? '';
+    if (/^\s*\+\d+\s*$/.test(raw)) {
+      const p = t.parentElement;
+      if (p && /^(p|span|li|div|button)$/i.test(p.tagName)) {
+        toRemove.push(t);
+      }
+    }
+    n = walker.nextNode();
+  }
+  for (const t of toRemove) {
+    t.remove();
+  }
+}
 
 /**
  * Gemini 캔버스 등은 `<math-block>` 대신 `<div class="math-block" data-math="...">` 형태를 씀.
@@ -128,7 +184,7 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
 
     domNode.childNodes.forEach((child) => {
       const rawTag = child.nodeName.toLowerCase();
-      if (child.nodeType === Node.ELEMENT_NODE && SKIP_ELEMENT_TAGS.has(rawTag)) {
+      if (shouldSkipDomElement(child)) {
         return;
       }
       const newMdNode: MdNode = {
@@ -282,8 +338,9 @@ function renderMdTree(node: MdNode, depth = 0, parentType: string | null = null,
  */
 export function htmlToMarkdown(html: string): string {
   const body = parseHTML(html);
-  body.querySelectorAll(Array.from(SKIP_ELEMENT_TAGS).join(',')).forEach((el) => {
+  body.querySelectorAll(skipElementRemovalSelector()).forEach((el) => {
     el.remove();
   });
+  stripOrphanSourceCountTextNodes(body);
   return parseHtmlToMarkdownBfs(body.innerHTML);
 }
