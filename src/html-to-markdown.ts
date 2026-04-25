@@ -227,7 +227,13 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
   return renderMdTree(mdRoot).replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function renderMdTree(node: MdNode, depth = 0, parentType: string | null = null, inTableCell = false): string {
+function renderMdTree(
+  node: MdNode,
+  depth = 0,
+  parentType: string | null = null,
+  inTableCell = false,
+  olLiIndex?: number,
+): string {
   if (node.type === '#text') {
     if (parentType === 'pre') {
       return node.text.replace(/\r\n/g, '\n');
@@ -255,7 +261,23 @@ function renderMdTree(node: MdNode, depth = 0, parentType: string | null = null,
 
   const nextDepth = node.type === 'li' ? depth + 1 : depth;
   const passTableCell = inTableCell || node.type === 'th' || node.type === 'td';
-  const childContent = node.children.map((child) => renderMdTree(child, nextDepth, node.type, passTableCell)).join('');
+  let childContent: string;
+  if (node.type === 'ol') {
+    let liOrdinal = 0;
+    childContent = node.children
+      .map((child) => {
+        if (child.type === 'li') {
+          liOrdinal += 1;
+          return renderMdTree(child, nextDepth, node.type, passTableCell, liOrdinal);
+        }
+        return renderMdTree(child, nextDepth, node.type, passTableCell);
+      })
+      .join('');
+  } else {
+    childContent = node.children
+      .map((child) => renderMdTree(child, nextDepth, node.type, passTableCell))
+      .join('');
+  }
 
   switch (node.type) {
     case 'h1':
@@ -292,10 +314,12 @@ function renderMdTree(node: MdNode, depth = 0, parentType: string | null = null,
       const indent = '  '.repeat(depth);
       const content = childContent.trim();
       if (!content) return '';
+      const marker =
+        parentType === 'ol' && olLiIndex !== undefined ? `${olLiIndex}. ` : '- ';
       const lines = content.split('\n');
       const formatted = lines
         .map((line, i) => {
-          if (i === 0) return `${indent}- ${line}`;
+          if (i === 0) return `${indent}${marker}${line}`;
           if (line.trim() === '') return '';
           return /^\s/.test(line) ? line : `  ${indent}${line}`;
         })
