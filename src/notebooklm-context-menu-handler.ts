@@ -1,13 +1,12 @@
 /**
- * Context menu 클릭 시 선택 영역 HTML을 Markdown으로 변환하여 클립보드에 복사
+ * NotebookLM: context menu 클릭 시 선택 영역 HTML을 Markdown으로 변환하여 클립보드에 복사
  */
-import { htmlToMarkdown } from './html-to-markdown.ts';
+import { notebooklmHtmlToMarkdown } from './notebooklm-html-to-markdown.ts';
 import {
   isExtensionContextValid,
   startSelectionReadableWatcher,
 } from './notify-selection-readable.ts';
 
-/** 선택 영역 HTML을 읽을 수 있는지 검사 (canvas, shadow DOM 등 비읽기 영역 제외) */
 function isSelectionReadable(): boolean {
   try {
     const sel = window.getSelection();
@@ -72,7 +71,6 @@ chrome.runtime.onMessage.addListener(
         const container = document.createElement('div');
         container.appendChild(range.cloneContents());
 
-        // 선택 영역의 마지막 엘리먼트가 눈에 보이는 텍스트를 가지지 않는 경우 제거
         let lastEl = container.lastElementChild;
         while (lastEl && (lastEl.textContent ?? '').trim() === '') {
           const prev = lastEl.previousElementSibling;
@@ -86,7 +84,7 @@ chrome.runtime.onMessage.addListener(
           return;
         }
 
-        const markdown = htmlToMarkdown(html);
+        const markdown = notebooklmHtmlToMarkdown(html);
         await navigator.clipboard.writeText(markdown);
         showCopyFeedback();
         sendResponse({ success: true });
@@ -95,6 +93,6 @@ chrome.runtime.onMessage.addListener(
       }
     })();
 
-    return true; // 비동기 sendResponse를 위해 true 반환
+    return true;
   }
 );

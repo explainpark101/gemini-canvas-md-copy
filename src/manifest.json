@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Canvas Markdown Copy",
-  "version": "1.1.8",
+  "version": "2.0.0",
   "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구",
   "icons": {
     "16": "icon-16.png",
@@ -18,7 +18,10 @@
     }
   },
   "permissions": ["clipboardWrite", "contextMenus"],
-  "host_permissions": ["https://gemini.google.com/*"],
+  "host_permissions": [
+    "https://gemini.google.com/*",
+    "https://notebooklm.google.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -32,6 +35,17 @@
     {
       "matches": ["https://gemini.google.com/*"],
       "js": ["context-menu-handler.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://notebooklm.google.com/*"],
+      "css": ["content.css"],
+      "js": ["notebooklm-content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://notebooklm.google.com/*"],
+      "js": ["notebooklm-context-menu-handler.js"],
       "run_at": "document_idle"
     }
   ]

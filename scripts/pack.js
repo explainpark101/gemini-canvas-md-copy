@@ -11,7 +11,22 @@ const distDir = join(rootDir, 'dist');
 const srcDir = join(rootDir, 'src');
 const versionsDir = join(rootDir, 'versions');
 
-const COPY_EXCLUDE = ['content.ts', 'content.js', 'context-menu-handler.ts', 'context-menu-handler.js', 'background.ts', 'background.js', 'html-to-markdown.ts', 'html2md.jsx'];
+const COPY_EXCLUDE = [
+  'content.ts',
+  'content.js',
+  'context-menu-handler.ts',
+  'context-menu-handler.js',
+  'background.ts',
+  'background.js',
+  'html-to-markdown.ts',
+  'notify-selection-readable.ts',
+  'notebooklm-content.ts',
+  'notebooklm-content.js',
+  'notebooklm-context-menu-handler.ts',
+  'notebooklm-context-menu-handler.js',
+  'notebooklm-html-to-markdown.ts',
+  'html2md.jsx',
+];
 
 function buildScripts() {
   if (!existsSync(distDir)) {
@@ -21,6 +36,8 @@ function buildScripts() {
     ['content.ts', 'content.js'],
     ['context-menu-handler.ts', 'context-menu-handler.js'],
     ['background.ts', 'background.js'],
+    ['notebooklm-content.ts', 'notebooklm-content.js'],
+    ['notebooklm-context-menu-handler.ts', 'notebooklm-context-menu-handler.js'],
   ];
   for (const [src, out] of scripts) {
     const result = spawnSync('bun', ['build', join(srcDir, src), '--outdir', distDir], {

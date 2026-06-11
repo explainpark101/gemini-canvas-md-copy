@@ -29,7 +29,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   chrome.tabs.sendMessage(tab.id, { action: 'copySelectionAsMarkdown' }, (response) => {
     if (chrome.runtime.lastError) {
-      console.warn('[GEMINI_CANVAS_MD_COPY]', chrome.runtime.lastError.message);
+      console.warn('[MD_COPY]', chrome.runtime.lastError.message);
       return;
     }
     if (response?.success) {
