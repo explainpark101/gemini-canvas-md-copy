@@ -2,12 +2,23 @@
  * NotebookLM report-viewer HTML → Markdown (Gemini htmlToMarkdown과 별도)
  */
 
+/** 마크다운에 포함하지 않을 NotebookLM UI (인용 각주 버튼 등) */
+const SKIP_ELEMENT_SELECTOR = 'button.citation-marker';
+
+function shouldSkipNotebooklmElement(el: Element): boolean {
+  return el.matches(SKIP_ELEMENT_SELECTOR);
+}
+
 export function notebooklmHtmlToMarkdown(htmlString: string): string {
   if (!htmlString) return '';
 
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, 'text/html');
+
+    doc.body.querySelectorAll(SKIP_ELEMENT_SELECTOR).forEach((el) => {
+      el.remove();
+    });
 
     const walk = (node: Node, depth = 0): string => {
       if (node.nodeType === 3) {
@@ -17,6 +28,8 @@ export function notebooklmHtmlToMarkdown(htmlString: string): string {
       if (node.nodeType !== 1) return '';
 
       const el = node as Element;
+      if (shouldSkipNotebooklmElement(el)) return '';
+
       const tag = el.tagName.toLowerCase();
       const classes = typeof el.className === 'string' ? el.className : '';
 
