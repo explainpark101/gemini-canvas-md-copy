@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import archiver from 'archiver';
+import { uniqueArray } from '../src/utils/uniqueArray.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
@@ -11,7 +12,7 @@ const distDir = join(rootDir, 'dist');
 const srcDir = join(rootDir, 'src');
 const versionsDir = join(rootDir, 'versions');
 
-const COPY_EXCLUDE = Array.from(new Set([
+const COPY_EXCLUDE = uniqueArray([
   'content.ts',
   'content.js',
   'context-menu-handler.ts',
@@ -30,7 +31,7 @@ const COPY_EXCLUDE = Array.from(new Set([
   'citation-mode.ts',
   'html-to-markdown.ts',
   'html2md.jsx',
-]));
+]);
 
 function buildScripts() {
   if (!existsSync(distDir)) {

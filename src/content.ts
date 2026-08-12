@@ -1,4 +1,5 @@
 import { htmlToMarkdown } from './html-to-markdown.ts';
+import { getStoredCitationMode } from './citation-mode.ts';
 
 (function() {
     'use strict';
@@ -100,7 +101,34 @@ import { htmlToMarkdown } from './html-to-markdown.ts';
     async function copyContent(): Promise<void> {
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
-            const markdownResult = htmlToMarkdown(target.innerHTML);
+            const citationMode = await getStoredCitationMode();
+            // Link mode is not implemented yet — behave like "none".
+            const modeForCopy = citationMode === 'footnote' ? 'footnote' : 'none';
+            if (modeForCopy === 'footnote') {
+                const responseContainer = document.querySelector('.response-container-content');
+                const sourceLists = responseContainer?.querySelector('deep-research-source-lists');
+                console.log('[MD_COPY][footnote] canvas containers', {
+                    citationMode,
+                    hasResponseContainer: Boolean(responseContainer),
+                    hasStructuredContent: Boolean(
+                        responseContainer?.querySelector('structured-content-container'),
+                    ),
+                    hasDeepResearchSourceLists: Boolean(sourceLists),
+                    deepResearchSourceListsHtmlPreview: sourceLists
+                        ? sourceLists.outerHTML.slice(0, 500)
+                        : null,
+                });
+            }
+            const markdownResult = htmlToMarkdown(target.innerHTML, {
+                citationMode: modeForCopy,
+                sourcesRoot: modeForCopy === 'footnote' ? document : null,
+            });
+            if (modeForCopy === 'footnote') {
+                console.log('[MD_COPY][footnote] markdown result (tail)', {
+                    length: markdownResult.length,
+                    tail: markdownResult.slice(-800),
+                });
+            }
             try {
                 await navigator.clipboard.writeText(markdownResult);
                 showFeedback('Copied!', copyBtn);

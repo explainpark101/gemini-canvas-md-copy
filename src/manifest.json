@@ -10,7 +10,7 @@
     "128": "icon-128.png"
   },
   "action": {
-    "default_title": "출처 복사 모드",
+    "default_title": "출처 복사: 출처 복사 안함",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon-16.png",
@@ -19,7 +19,7 @@
       "128": "icon-128.png"
     }
   },
-  "permissions": ["clipboardWrite", "contextMenus"],
+  "permissions": ["clipboardWrite", "contextMenus", "storage"],
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://notebooklm.google.com/*"

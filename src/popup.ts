@@ -1,6 +1,6 @@
 import {
   CITATION_MODE_STORAGE_KEY,
-  DEFAULT_CITATION_MODE,
+  getStoredCitationMode,
   isCitationMode,
   type CitationMode,
 } from './citation-mode.ts';
@@ -21,9 +21,7 @@ function selectMode(mode: CitationMode): void {
 }
 
 async function loadMode(): Promise<void> {
-  const stored = await chrome.storage.sync.get(CITATION_MODE_STORAGE_KEY);
-  const raw = stored[CITATION_MODE_STORAGE_KEY];
-  const mode = isCitationMode(raw) ? raw : DEFAULT_CITATION_MODE;
+  const mode = await getStoredCitationMode();
   selectMode(mode);
 }
 

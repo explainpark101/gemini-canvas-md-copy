@@ -1,5 +1,6 @@
 /**
- * Citation copy mode preference (options only; footnote/link conversion TBD).
+ * Citation copy mode preference.
+ * Footnote mode is implemented for the floating copy button; link mode TBD.
  */
 
 export const CITATION_MODE_STORAGE_KEY = 'citationMode';
@@ -10,6 +11,18 @@ export type CitationMode = (typeof CITATION_MODES)[number];
 
 export const DEFAULT_CITATION_MODE: CitationMode = 'none';
 
+export const CITATION_MODE_LABELS: Record<CitationMode, string> = {
+  footnote: '각주모드',
+  link: '링크모드',
+  none: '출처 복사 안함',
+};
+
 export function isCitationMode(value: unknown): value is CitationMode {
   return typeof value === 'string' && (CITATION_MODES as readonly string[]).includes(value);
+}
+
+export async function getStoredCitationMode(): Promise<CitationMode> {
+  const stored = await chrome.storage.sync.get(CITATION_MODE_STORAGE_KEY);
+  const raw = stored[CITATION_MODE_STORAGE_KEY];
+  return isCitationMode(raw) ? raw : DEFAULT_CITATION_MODE;
 }

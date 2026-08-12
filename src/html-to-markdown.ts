@@ -2,6 +2,21 @@
  * HTML을 Markdown으로 변환하는 공유 유틸리티 (BFS 트리 파싱 + renderMdTree)
  */
 
+import type { CitationMode } from './citation-mode.ts';
+
+export interface HtmlToMarkdownOptions {
+  citationMode?: CitationMode;
+  /** Canvas root used to collect deep-research used-sources (footnote mode). */
+  sourcesRoot?: ParentNode | null;
+}
+
+export interface UsedSource {
+  index: number;
+  href: string;
+  domain: string;
+  title: string;
+}
+
 // Trusted Types 정책 설정 (보안 정책 우회용)
 let trustedPolicy: { createHTML: (s: string) => string };
 const tt = (globalThis as { trustedTypes?: { createPolicy: (n: string, o: object) => unknown } }).trustedTypes;
@@ -358,13 +373,120 @@ function renderMdTree(
 }
 
 /**
+ * Replace source-footnote markers with Markdown footnote refs: [^n]
+ * Consecutive duplicate indices are collapsed to a single marker.
+ */
+function convertSourceFootnotesToMarkers(root: HTMLElement): void {
+  const footnotes = Array.from(root.querySelectorAll('source-footnote'));
+  let lastIndex: string | null = null;
+
+  for (const el of footnotes) {
+    const sup = el.querySelector('sup[data-turn-source-index]');
+    const index = (sup?.getAttribute('data-turn-source-index') || '').trim();
+    if (!/^\d+$/.test(index)) {
+      el.remove();
+      lastIndex = null;
+      continue;
+    }
+    if (index === lastIndex) {
+      el.remove();
+      continue;
+    }
+    lastIndex = index;
+    el.replaceWith(root.ownerDocument.createTextNode(`[^${index}]`));
+  }
+}
+
+/**
+ * Collect used sources from `.response-container-content > deep-research-source-lists`.
+ * Index is 1-based list order (matches data-turn-source-index).
+ */
+export function extractUsedSources(root: ParentNode): UsedSource[] {
+  const responseContainer = root.querySelector('.response-container-content');
+  const sourceLists =
+    responseContainer?.querySelector('deep-research-source-lists') ??
+    root.querySelector('deep-research-source-lists');
+
+  const usedSourcesList =
+    sourceLists?.querySelector('.source-list.used-sources') ?? null;
+
+  const searchRoot = usedSourcesList ?? sourceLists;
+  const anchors = searchRoot
+    ? Array.from(searchRoot.querySelectorAll('browse-web-item > a'))
+    : [];
+
+  const sources = anchors.map((anchor, i) => {
+    const a = anchor as HTMLAnchorElement;
+    const content = a.querySelector('[data-test-id="content"]');
+    const domain =
+      content?.querySelector('[data-test-id="domain-name"]')?.textContent?.trim() || '';
+    const title =
+      content?.querySelector('[data-test-id="sub-title"]')?.textContent?.trim() || '';
+    const href = (a.getAttribute('href') || a.href || '').trim();
+    return {
+      index: i + 1,
+      href,
+      domain,
+      title,
+    };
+  });
+
+  console.log('[MD_COPY][footnote] source extraction', {
+    hasResponseContainer: Boolean(responseContainer),
+    hasDeepResearchSourceLists: Boolean(sourceLists),
+    hasUsedSourcesList: Boolean(usedSourcesList),
+    anchorCount: anchors.length,
+    sources,
+  });
+
+  return sources;
+}
+
+/** Format used sources as Markdown footnote definitions. */
+export function formatSourceFootnoteDefinitions(sources: UsedSource[]): string {
+  if (sources.length === 0) return '';
+
+  return sources
+    .map((source) => {
+      const meta = [source.domain, source.title].filter(Boolean).join(' - ');
+      if (meta && source.href) {
+        return `[^${source.index}]: ${meta}\n${source.href}`;
+      }
+      if (meta) {
+        return `[^${source.index}]: ${meta}`;
+      }
+      if (source.href) {
+        return `[^${source.index}]: ${source.href}`;
+      }
+      return `[^${source.index}]:`;
+    })
+    .join('\n\n');
+}
+
+/**
  * HTML 문자열을 Markdown으로 변환
  */
-export function htmlToMarkdown(html: string): string {
+export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}): string {
+  const citationMode = options.citationMode ?? 'none';
   const body = parseHTML(html);
+
+  if (citationMode === 'footnote') {
+    convertSourceFootnotesToMarkers(body);
+  }
+
   body.querySelectorAll(skipElementRemovalSelector()).forEach((el) => {
     el.remove();
   });
   stripOrphanSourceCountTextNodes(body);
-  return parseHtmlToMarkdownBfs(body.innerHTML);
+
+  let markdown = parseHtmlToMarkdownBfs(body.innerHTML);
+
+  if (citationMode === 'footnote' && options.sourcesRoot) {
+    const defs = formatSourceFootnoteDefinitions(extractUsedSources(options.sourcesRoot));
+    if (defs) {
+      markdown = `${markdown}\n\n${defs}`;
+    }
+  }
+
+  return markdown;
 }
