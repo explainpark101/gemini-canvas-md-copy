@@ -55,7 +55,11 @@ const SKIP_ELEMENT_TAGS = new Set([
 ]);
 
 /** 태그 외에 class로만 표시되는 출처 UI 래퍼 (선택 복사 시 부모 태그가 잘려도 남는 경우 대비) */
-const SKIP_ELEMENT_CLASS_NAMES = new Set(['source-inline-chip', 'source-inline-chip-container']);
+const SKIP_ELEMENT_CLASS_NAMES = new Set([
+  'source-inline-chip',
+  'source-inline-chip-container',
+  'sources-carousel-inline',
+]);
 
 /** 출처 칩 라벨(+N 등): 선택 영역 복사 시 커스텀 태그가 깨져도 이 속성이 있으면 스킵 */
 const SKIP_IF_HAS_ATTRIBUTE = 'hide-from-message-actions';
@@ -80,6 +84,16 @@ function skipElementRemovalSelector(): string {
     `[${SKIP_IF_HAS_ATTRIBUTE}]`,
   ];
   return parts.join(',');
+}
+
+/**
+ * Always drop Gemini inline source carousels from copy output.
+ * Handles both the custom element and class-only remnants after selection clone.
+ */
+function stripSourcesCarouselInline(root: HTMLElement): void {
+  root
+    .querySelectorAll('sources-carousel-inline, .sources-carousel-inline')
+    .forEach((el) => el.remove());
 }
 
 /**
@@ -508,6 +522,9 @@ export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}
     (citationMode === 'footnote' || citationMode === 'link') && options.sourcesRoot
       ? extractUsedSources(options.sourcesRoot)
       : [];
+
+  // Remove carousel UI before citation conversion so chip/label noise never enters markdown.
+  stripSourcesCarouselInline(body);
 
   if (citationMode === 'footnote') {
     convertSourceFootnotesToMarkers(body);
