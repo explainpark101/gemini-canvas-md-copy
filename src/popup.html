@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>출처 복사 모드</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="popup">
+    <h1 class="popup__title">출처 복사 포함 복사</h1>
+    <p class="popup__hint">복사 시 출처 처리 방식을 선택합니다.</p>
+
+    <fieldset class="popup__fieldset" id="citation-mode-fieldset">
+      <legend class="visually-hidden">출처 복사 모드</legend>
+
+      <label class="popup__option">
+        <input type="radio" name="citationMode" value="footnote" />
+        <span class="popup__option-text">
+          <span class="popup__option-label">각주모드</span>
+          <span class="popup__option-desc">본문에 각주로 출처를 붙입니다 (준비 중)</span>
+        </span>
+      </label>
+
+      <label class="popup__option">
+        <input type="radio" name="citationMode" value="link" />
+        <span class="popup__option-text">
+          <span class="popup__option-label">링크모드</span>
+          <span class="popup__option-desc">본문에 링크로 출처를 붙입니다 (준비 중)</span>
+        </span>
+      </label>
+
+      <label class="popup__option">
+        <input type="radio" name="citationMode" value="none" />
+        <span class="popup__option-text">
+          <span class="popup__option-label">출처 복사 안함</span>
+          <span class="popup__option-desc">기존과 같이 Markdown만 복사합니다</span>
+        </span>
+      </label>
+    </fieldset>
+
+    <p class="popup__status" id="status" aria-live="polite"></p>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

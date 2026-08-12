@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Canvas Markdown Copy",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구",
   "icons": {
     "16": "icon-16.png",
@@ -10,6 +10,8 @@
     "128": "icon-128.png"
   },
   "action": {
+    "default_title": "출처 복사 모드",
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icon-16.png",
       "32": "icon-32.png",
