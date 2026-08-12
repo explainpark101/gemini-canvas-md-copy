@@ -2,6 +2,11 @@
  * Citation copy mode preference.
  * Footnote: inline [^n] + source list at bottom.
  * Link: inline [n](url) only (no bottom source list).
+ *
+ * Stored in chrome.storage.sync so the user's mode choice persists across
+ * sessions/devices and is shared by the action popup, badge/title, and
+ * floating copy button. Only this preference key is written — no page or
+ * clipboard content is stored.
  */
 
 export const CITATION_MODE_STORAGE_KEY = 'citationMode';
