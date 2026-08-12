@@ -1,7 +1,16 @@
 /**
  * Citation copy mode preference.
- * Footnote: inline [^n] + source list at bottom.
- * Link: inline [n](url) only (no bottom source list).
+ *
+ * Terminology:
+ * - Source name: domain-name + sub-title
+ * - URL: browse-web-item > a[href]
+ * - Footnote definition: bottom lines shaped like [^n]: ...
+ *
+ * Modes:
+ * - footnote: inline [^n] + bottom `[^n]: sourceName, url` (one line)
+ * - linkFootnote: inline [^n] + bottom `[^n]: url` only
+ * - link: inline [sourceName](url), no bottom list
+ * - none: strip sources (legacy copy)
  *
  * Stored in chrome.storage.sync so the user's mode choice persists across
  * sessions/devices and is shared by the action popup, badge/title, and
@@ -11,15 +20,16 @@
 
 export const CITATION_MODE_STORAGE_KEY = 'citationMode';
 
-export const CITATION_MODES = ['footnote', 'link', 'none'] as const;
+export const CITATION_MODES = ['footnote', 'linkFootnote', 'link', 'none'] as const;
 
 export type CitationMode = (typeof CITATION_MODES)[number];
 
-export const DEFAULT_CITATION_MODE: CitationMode = 'none';
+export const DEFAULT_CITATION_MODE: CitationMode = 'footnote';
 
 export const CITATION_MODE_LABELS: Record<CitationMode, string> = {
   footnote: '각주모드',
-  link: '링크모드',
+  linkFootnote: '링크 각주모드',
+  link: '인라인 링크모드',
   none: '출처 복사 안함',
 };
 

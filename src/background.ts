@@ -22,9 +22,15 @@ function citationActionTitle(mode: CitationMode): string {
 async function applyCitationModeToAction(mode: CitationMode): Promise<void> {
   await chrome.action.setTitle({ title: citationActionTitle(mode) });
   await chrome.action.setBadgeBackgroundColor({ color: '#1a73e8' });
-  await chrome.action.setBadgeText({
-    text: mode === 'none' ? '' : mode === 'footnote' ? '각주' : '링크',
-  });
+  const badgeText =
+    mode === 'none'
+      ? ''
+      : mode === 'footnote'
+        ? '각주'
+        : mode === 'linkFootnote'
+          ? '링주'
+          : '링크';
+  await chrome.action.setBadgeText({ text: badgeText });
 }
 
 async function ensureDefaultCitationMode(): Promise<CitationMode> {

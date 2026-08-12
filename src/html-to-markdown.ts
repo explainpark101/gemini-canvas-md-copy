@@ -411,16 +411,23 @@ function convertSourceFootnotesToMarkers(root: HTMLElement): void {
   }
 }
 
+/** Source name = domain-name + sub-title */
+function sourceDisplayName(source: UsedSource): string {
+  return [source.domain, source.title].filter(Boolean).join(' ').trim();
+}
+
+function escapeMarkdownLinkLabel(label: string): string {
+  return label.replace(/\[/g, '').replace(/\]/g, '');
+}
+
 /**
- * Replace source-footnote markers with inline Markdown links: [n](url)
+ * Replace source-footnote markers with inline Markdown links: [sourceName](url)
  * Consecutive duplicate indices are collapsed to a single marker.
  */
 function convertSourceFootnotesToLinks(root: HTMLElement, sources: UsedSource[]): void {
-  const hrefByIndex = new Map<number, string>();
+  const sourceByIndex = new Map<number, UsedSource>();
   for (const source of sources) {
-    if (source.href) {
-      hrefByIndex.set(source.index, source.href);
-    }
+    sourceByIndex.set(source.index, source);
   }
 
   const footnotes = Array.from(root.querySelectorAll('source-footnote'));
@@ -440,8 +447,11 @@ function convertSourceFootnotesToLinks(root: HTMLElement, sources: UsedSource[])
     }
     lastIndex = index;
 
-    const href = hrefByIndex.get(Number(index)) || '';
-    const marker = href ? `[${index}](${href})` : `[${index}]`;
+    const source = sourceByIndex.get(Number(index));
+    const href = source?.href || '';
+    const name = source ? sourceDisplayName(source) : '';
+    const label = escapeMarkdownLinkLabel(name || index);
+    const marker = href ? `[${label}](${href})` : `[${label}]`;
     el.replaceWith(root.ownerDocument.createTextNode(marker));
   }
 }
@@ -491,18 +501,31 @@ export function extractUsedSources(root: ParentNode): UsedSource[] {
   return sources;
 }
 
-/** Format used sources as Markdown footnote definitions. */
-export function formatSourceFootnoteDefinitions(sources: UsedSource[]): string {
+/**
+ * Format used sources as Markdown footnote definitions.
+ * - footnote: [^n]: sourceName, url  (single line; comma separates subtitle/name from url)
+ * - linkFootnote: [^n]: url
+ */
+export function formatSourceFootnoteDefinitions(
+  sources: UsedSource[],
+  mode: 'footnote' | 'linkFootnote' = 'footnote',
+): string {
   if (sources.length === 0) return '';
 
   return sources
     .map((source) => {
-      const meta = [source.domain, source.title].filter(Boolean).join(' - ');
-      if (meta && source.href) {
-        return `[^${source.index}]: ${meta}\n${source.href}`;
+      if (mode === 'linkFootnote') {
+        return source.href
+          ? `[^${source.index}]: ${source.href}`
+          : `[^${source.index}]:`;
       }
-      if (meta) {
-        return `[^${source.index}]: ${meta}`;
+
+      const name = sourceDisplayName(source);
+      if (name && source.href) {
+        return `[^${source.index}]: ${name}, ${source.href}`;
+      }
+      if (name) {
+        return `[^${source.index}]: ${name}`;
       }
       if (source.href) {
         return `[^${source.index}]: ${source.href}`;
@@ -518,15 +541,17 @@ export function formatSourceFootnoteDefinitions(sources: UsedSource[]): string {
 export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}): string {
   const citationMode = options.citationMode ?? 'none';
   const body = parseHTML(html);
+  const needsSources =
+    citationMode === 'footnote' ||
+    citationMode === 'linkFootnote' ||
+    citationMode === 'link';
   const sources =
-    (citationMode === 'footnote' || citationMode === 'link') && options.sourcesRoot
-      ? extractUsedSources(options.sourcesRoot)
-      : [];
+    needsSources && options.sourcesRoot ? extractUsedSources(options.sourcesRoot) : [];
 
   // Remove carousel UI before citation conversion so chip/label noise never enters markdown.
   stripSourcesCarouselInline(body);
 
-  if (citationMode === 'footnote') {
+  if (citationMode === 'footnote' || citationMode === 'linkFootnote') {
     convertSourceFootnotesToMarkers(body);
   } else if (citationMode === 'link') {
     convertSourceFootnotesToLinks(body, sources);
@@ -539,9 +564,12 @@ export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}
 
   let markdown = parseHtmlToMarkdownBfs(body.innerHTML);
 
-  // Footnote mode appends definitions at the bottom; link mode keeps only inline [n](url).
-  if (citationMode === 'footnote' && sources.length > 0) {
-    const defs = formatSourceFootnoteDefinitions(sources);
+  // footnote / linkFootnote append definitions at the bottom; link keeps only inline links.
+  if (
+    (citationMode === 'footnote' || citationMode === 'linkFootnote') &&
+    sources.length > 0
+  ) {
+    const defs = formatSourceFootnoteDefinitions(sources, citationMode);
     if (defs) {
       markdown = `${markdown}\n\n${defs}`;
     }

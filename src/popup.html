@@ -18,15 +18,23 @@
         <input type="radio" name="citationMode" value="footnote" />
         <span class="popup__option-text">
           <span class="popup__option-label">각주모드</span>
-          <span class="popup__option-desc">본문에 [^n] 각주를 넣고 하단에 출처 목록을 붙입니다</span>
+          <span class="popup__option-desc">본문에 [^n] 각주를 넣고 하단에 `[^n]: 출처명, url` 한 줄 목록을 붙입니다</span>
+        </span>
+      </label>
+
+      <label class="popup__option">
+        <input type="radio" name="citationMode" value="linkFootnote" />
+        <span class="popup__option-text">
+          <span class="popup__option-label">링크 각주모드</span>
+          <span class="popup__option-desc">본문에 [^n] 각주를 넣고 하단에 `[^n]: url` 목록만 붙입니다</span>
         </span>
       </label>
 
       <label class="popup__option">
         <input type="radio" name="citationMode" value="link" />
         <span class="popup__option-text">
-          <span class="popup__option-label">링크모드</span>
-          <span class="popup__option-desc">본문에 [n](url) 인라인 링크만 넣고 하단 목록은 붙이지 않습니다</span>
+          <span class="popup__option-label">인라인 링크모드</span>
+          <span class="popup__option-desc">본문에 [출처명](url) 인라인 링크만 넣고 하단 목록은 붙이지 않습니다</span>
         </span>
       </label>
 

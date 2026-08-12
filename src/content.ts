@@ -102,7 +102,10 @@ import { getStoredCitationMode } from './citation-mode.ts';
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
             const citationMode = await getStoredCitationMode();
-            const needsSources = citationMode === 'footnote' || citationMode === 'link';
+            const needsSources =
+                citationMode === 'footnote' ||
+                citationMode === 'linkFootnote' ||
+                citationMode === 'link';
             if (needsSources) {
                 const responseContainer = document.querySelector('.response-container-content');
                 const sourceLists = responseContainer?.querySelector('deep-research-source-lists');
