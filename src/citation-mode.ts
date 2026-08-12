@@ -1,6 +1,7 @@
 /**
  * Citation copy mode preference.
- * Footnote mode is implemented for the floating copy button; link mode TBD.
+ * Footnote: inline [^n] + source list at bottom.
+ * Link: inline [n](url) only (no bottom source list).
  */
 
 export const CITATION_MODE_STORAGE_KEY = 'citationMode';

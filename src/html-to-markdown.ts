@@ -398,6 +398,41 @@ function convertSourceFootnotesToMarkers(root: HTMLElement): void {
 }
 
 /**
+ * Replace source-footnote markers with inline Markdown links: [n](url)
+ * Consecutive duplicate indices are collapsed to a single marker.
+ */
+function convertSourceFootnotesToLinks(root: HTMLElement, sources: UsedSource[]): void {
+  const hrefByIndex = new Map<number, string>();
+  for (const source of sources) {
+    if (source.href) {
+      hrefByIndex.set(source.index, source.href);
+    }
+  }
+
+  const footnotes = Array.from(root.querySelectorAll('source-footnote'));
+  let lastIndex: string | null = null;
+
+  for (const el of footnotes) {
+    const sup = el.querySelector('sup[data-turn-source-index]');
+    const index = (sup?.getAttribute('data-turn-source-index') || '').trim();
+    if (!/^\d+$/.test(index)) {
+      el.remove();
+      lastIndex = null;
+      continue;
+    }
+    if (index === lastIndex) {
+      el.remove();
+      continue;
+    }
+    lastIndex = index;
+
+    const href = hrefByIndex.get(Number(index)) || '';
+    const marker = href ? `[${index}](${href})` : `[${index}]`;
+    el.replaceWith(root.ownerDocument.createTextNode(marker));
+  }
+}
+
+/**
  * Collect used sources from `.response-container-content > deep-research-source-lists`.
  * Index is 1-based list order (matches data-turn-source-index).
  */
@@ -431,7 +466,7 @@ export function extractUsedSources(root: ParentNode): UsedSource[] {
     };
   });
 
-  console.log('[MD_COPY][footnote] source extraction', {
+  console.log('[MD_COPY][citation] source extraction', {
     hasResponseContainer: Boolean(responseContainer),
     hasDeepResearchSourceLists: Boolean(sourceLists),
     hasUsedSourcesList: Boolean(usedSourcesList),
@@ -469,9 +504,15 @@ export function formatSourceFootnoteDefinitions(sources: UsedSource[]): string {
 export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}): string {
   const citationMode = options.citationMode ?? 'none';
   const body = parseHTML(html);
+  const sources =
+    (citationMode === 'footnote' || citationMode === 'link') && options.sourcesRoot
+      ? extractUsedSources(options.sourcesRoot)
+      : [];
 
   if (citationMode === 'footnote') {
     convertSourceFootnotesToMarkers(body);
+  } else if (citationMode === 'link') {
+    convertSourceFootnotesToLinks(body, sources);
   }
 
   body.querySelectorAll(skipElementRemovalSelector()).forEach((el) => {
@@ -481,8 +522,9 @@ export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}
 
   let markdown = parseHtmlToMarkdownBfs(body.innerHTML);
 
-  if (citationMode === 'footnote' && options.sourcesRoot) {
-    const defs = formatSourceFootnoteDefinitions(extractUsedSources(options.sourcesRoot));
+  // Footnote mode appends definitions at the bottom; link mode keeps only inline [n](url).
+  if (citationMode === 'footnote' && sources.length > 0) {
+    const defs = formatSourceFootnoteDefinitions(sources);
     if (defs) {
       markdown = `${markdown}\n\n${defs}`;
     }

@@ -102,12 +102,11 @@ import { getStoredCitationMode } from './citation-mode.ts';
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
             const citationMode = await getStoredCitationMode();
-            // Link mode is not implemented yet — behave like "none".
-            const modeForCopy = citationMode === 'footnote' ? 'footnote' : 'none';
-            if (modeForCopy === 'footnote') {
+            const needsSources = citationMode === 'footnote' || citationMode === 'link';
+            if (needsSources) {
                 const responseContainer = document.querySelector('.response-container-content');
                 const sourceLists = responseContainer?.querySelector('deep-research-source-lists');
-                console.log('[MD_COPY][footnote] canvas containers', {
+                console.log('[MD_COPY][citation] canvas containers', {
                     citationMode,
                     hasResponseContainer: Boolean(responseContainer),
                     hasStructuredContent: Boolean(
@@ -120,11 +119,12 @@ import { getStoredCitationMode } from './citation-mode.ts';
                 });
             }
             const markdownResult = htmlToMarkdown(target.innerHTML, {
-                citationMode: modeForCopy,
-                sourcesRoot: modeForCopy === 'footnote' ? document : null,
+                citationMode,
+                sourcesRoot: needsSources ? document : null,
             });
-            if (modeForCopy === 'footnote') {
-                console.log('[MD_COPY][footnote] markdown result (tail)', {
+            if (needsSources) {
+                console.log('[MD_COPY][citation] markdown result', {
+                    citationMode,
                     length: markdownResult.length,
                     tail: markdownResult.slice(-800),
                 });
