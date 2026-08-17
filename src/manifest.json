@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Gemini Canvas Markdown Copy",
-  "version": "2.1.1",
-  "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구",
+  "version": "2.2.0",
+  "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구. 선택해서 복사하기는 ChatGPT도 지원함.",
   "icons": {
     "16": "icon-16.png",
     "32": "icon-32.png",
@@ -22,7 +22,8 @@
   "permissions": ["clipboardWrite", "contextMenus", "storage"],
   "host_permissions": [
     "https://gemini.google.com/*",
-    "https://notebooklm.google.com/*"
+    "https://notebooklm.google.com/*",
+    "https://chatgpt.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -35,7 +36,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://gemini.google.com/*"],
+      "matches": ["https://gemini.google.com/*", "https://chatgpt.com/*"],
       "js": ["context-menu-handler.js"],
       "run_at": "document_idle"
     },
@@ -48,6 +49,12 @@
     {
       "matches": ["https://notebook.google.com/*"],
       "js": ["notebooklm-context-menu-handler.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["chatGPT-fix-copyButton.js"],
+      "css": ["content.css"],
       "run_at": "document_idle"
     }
   ]

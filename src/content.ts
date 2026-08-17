@@ -1,29 +1,65 @@
 import { htmlToMarkdown } from './html-to-markdown.ts';
-import { getStoredCitationMode } from './citation-mode.ts';
+import {
+    CITATION_MODE_LABELS,
+    CITATION_MODE_STORAGE_KEY,
+    CITATION_MODES,
+    getStoredCitationMode,
+    isCitationMode,
+    type CitationMode,
+} from './citation-mode.ts';
 
-(function() {
+(function () {
     'use strict';
 
-    // 타겟 셀렉터 정의
-    const TARGET_SELECTOR = ':is(message-content#extended-response-message-content, immersive-editor#extended-response-message-content) .markdown';
+    const TARGET_SELECTOR =
+        ':is(message-content#extended-response-message-content, immersive-editor#extended-response-message-content) .markdown';
 
-    // 3. 버튼 요소 생성
     const btn = document.createElement('div');
     btn.id = 'custom-floating-copy-btn';
 
+    const main = document.createElement('div');
+    main.className = 'fab-main';
+
     const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'fab-copy';
     copyBtn.innerText = 'Copy Markdown';
 
-    btn.appendChild(copyBtn);
+    const menuBtn = document.createElement('button');
+    menuBtn.type = 'button';
+    menuBtn.className = 'fab-menu-toggle';
+    menuBtn.setAttribute('aria-label', '출처 복사 모드 변경');
+    menuBtn.setAttribute('aria-haspopup', 'menu');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    menuBtn.innerHTML =
+        '<svg class="fab-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>';
 
-    // 4. 로컬 스토리지에서 초기 위치 불러오기
+    const menu = document.createElement('div');
+    menu.className = 'fab-menu';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+
+    for (const mode of CITATION_MODES) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'fab-menu-item';
+        item.setAttribute('role', 'menuitemradio');
+        item.dataset.mode = mode;
+        item.textContent = CITATION_MODE_LABELS[mode];
+        menu.appendChild(item);
+    }
+
+    main.appendChild(copyBtn);
+    main.appendChild(menuBtn);
+    btn.appendChild(main);
+    btn.appendChild(menu);
+
     const savedX = localStorage.getItem('floatingBtnX') || '5vw';
     const savedY = localStorage.getItem('floatingBtnY') || '90vh';
     btn.style.left = savedX;
     btn.style.top = savedY;
     document.body.appendChild(btn);
 
-    // 5. 드래그 및 클릭 로직
     let isDragging = false;
     let isLongPress = false;
     let longPressTimer: ReturnType<typeof setTimeout>;
@@ -31,6 +67,61 @@ import { getStoredCitationMode } from './citation-mode.ts';
     let initialLeft: number, initialTop: number;
     let isButtonActive = false;
     let clickTarget: Element | null = null;
+    let menuOpen = false;
+
+    function updateMenuPlacement(): void {
+        const rect = btn.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const openDown = centerY < window.innerHeight * 0.5;
+        const openRight = centerX < window.innerWidth * 0.5;
+
+        btn.classList.toggle('menu-down', openDown);
+        btn.classList.toggle('menu-up', !openDown);
+        btn.classList.toggle('menu-right', openRight);
+        btn.classList.toggle('menu-left', !openRight);
+    }
+
+    function setMenuOpen(open: boolean): void {
+        menuOpen = open;
+        if (open) {
+            updateMenuPlacement();
+        }
+        menu.hidden = !open;
+        menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.classList.toggle('menu-open', open);
+    }
+
+    function syncMenuSelection(mode: CitationMode): void {
+        for (const item of menu.querySelectorAll<HTMLButtonElement>('.fab-menu-item')) {
+            const selected = item.dataset.mode === mode;
+            item.classList.toggle('is-selected', selected);
+            item.setAttribute('aria-checked', selected ? 'true' : 'false');
+        }
+        menuBtn.title = `출처 복사: ${CITATION_MODE_LABELS[mode]}`;
+        copyBtn.title = `Copy Markdown (${CITATION_MODE_LABELS[mode]})`;
+    }
+
+    async function loadCitationMode(): Promise<void> {
+        const mode = await getStoredCitationMode();
+        syncMenuSelection(mode);
+    }
+
+    async function saveCitationMode(mode: CitationMode): Promise<void> {
+        await chrome.storage.sync.set({ [CITATION_MODE_STORAGE_KEY]: mode });
+        syncMenuSelection(mode);
+        setMenuOpen(false);
+        showFeedback(CITATION_MODE_LABELS[mode], copyBtn);
+    }
+
+    void loadCitationMode();
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== 'sync') return;
+        const change = changes[CITATION_MODE_STORAGE_KEY];
+        if (!change || !isCitationMode(change.newValue)) return;
+        syncMenuSelection(change.newValue);
+    });
 
     btn.addEventListener('pointerdown', (e: PointerEvent) => {
         if (!isButtonActive) return;
@@ -48,6 +139,7 @@ import { getStoredCitationMode } from './citation-mode.ts';
         longPressTimer = setTimeout(() => {
             if (!isButtonActive) return;
             isLongPress = true;
+            setMenuOpen(false);
             btn.style.opacity = '0.8';
             btn.style.cursor = 'grabbing';
         }, 300);
@@ -89,7 +181,17 @@ import { getStoredCitationMode } from './citation-mode.ts';
             localStorage.setItem('floatingBtnX', btn.style.left);
             localStorage.setItem('floatingBtnY', btn.style.top);
         } else if (!isLongPress && clickTarget) {
-            copyContent();
+            if (clickTarget === menuBtn || menuBtn.contains(clickTarget)) {
+                setMenuOpen(!menuOpen);
+            } else if (clickTarget === copyBtn || copyBtn.contains(clickTarget)) {
+                setMenuOpen(false);
+                void copyContent();
+            } else if (clickTarget.classList.contains('fab-menu-item')) {
+                const mode = clickTarget.dataset.mode;
+                if (isCitationMode(mode)) {
+                    void saveCitationMode(mode);
+                }
+            }
         }
 
         isDragging = false;
@@ -97,7 +199,28 @@ import { getStoredCitationMode } from './citation-mode.ts';
         clickTarget = null;
     });
 
-    // 6. 복사 함수 (GM_setClipboard → navigator.clipboard.writeText)
+    document.addEventListener(
+        'pointerdown',
+        (e: PointerEvent) => {
+            if (!menuOpen) return;
+            if (btn.contains(e.target as Node)) return;
+            setMenuOpen(false);
+        },
+        true,
+    );
+
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && menuOpen) {
+            setMenuOpen(false);
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (menuOpen) {
+            updateMenuPlacement();
+        }
+    });
+
     async function copyContent(): Promise<void> {
         const target = document.querySelector(TARGET_SELECTOR);
         if (target) {
@@ -135,7 +258,7 @@ import { getStoredCitationMode } from './citation-mode.ts';
             try {
                 await navigator.clipboard.writeText(markdownResult);
                 showFeedback('Copied!', copyBtn);
-            } catch (err) {
+            } catch {
                 showFeedback('Failed', copyBtn);
             }
         } else {
@@ -143,17 +266,14 @@ import { getStoredCitationMode } from './citation-mode.ts';
         }
     }
 
-    // 7. 시각적 피드백
     function showFeedback(msg: string, btnElement: HTMLButtonElement = copyBtn): void {
         const originalText = btnElement.innerText;
         btnElement.innerText = msg;
-        // alert(`[GEMINI_CANVAS_MARKDOWN_COPY] ${msg}`);
         setTimeout(() => {
             btnElement.innerText = originalText;
         }, 1500);
     }
 
-    // 8. Observer를 통한 동적 표시 및 애니메이션 로직
     let hideTimeout: ReturnType<typeof setTimeout>;
     function toggleButtonVisibility(): void {
         const targetExists = document.querySelector(TARGET_SELECTOR) !== null;
@@ -168,6 +288,7 @@ import { getStoredCitationMode } from './citation-mode.ts';
         } else if (!targetExists && isButtonActive) {
             console.debug('[GEMINI_CANVAS_MARKDOWN_COPY] canvas not found, hiding button');
             isButtonActive = false;
+            setMenuOpen(false);
             btn.classList.remove('visible');
 
             hideTimeout = setTimeout(() => {
@@ -186,7 +307,6 @@ import { getStoredCitationMode } from './citation-mode.ts';
 
     observer.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: true,
     });
-
 })();

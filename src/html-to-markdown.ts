@@ -73,6 +73,17 @@ function shouldSkipDomElement(node: Node): boolean {
   for (const cls of SKIP_ELEMENT_CLASS_NAMES) {
     if (el.classList.contains(cls)) return true;
   }
+
+  /** chatGPT: learning_viz skip
+  if (
+    el.classList.contains('contents') &&
+    el.querySelector('[data-testid="math-block-layout-content"]')
+  ) {
+    return true;
+  }
+  */
+
+
   return false;
 }
 
@@ -124,18 +135,25 @@ function stripOrphanSourceCountTextNodes(root: HTMLElement): void {
  * Gemini 캔버스 등은 `<math-block>` 대신 `<div class="math-block" data-math="...">` 형태를 씀.
  * 인라인은 `<span class="math-inline" data-math="...">` + 내부 `.katex` 조합이 흔함.
  * 태그명만 보면 수식이 `div`/`span`으로만 잡혀 KaTeX HTML만 풀리므로 class·data-math·annotation으로 정규화한다.
+ * 
+ * ChatGPT의 경우, <span data-math-source="..." ></span> 형태를 사용하며, `$$` 로 감싼 full-width 수식의 경우 span의 style이 [style="display: block;"]로 구성됨.
  */
 function normalizeMathElementType(tag: string, node: Node): string {
   if (tag === 'math-block' || tag === 'math-inline' || tag === 'math-display') {
     return tag;
   }
   if (node.nodeType !== Node.ELEMENT_NODE) return tag;
+
   const el = node as Element;
+  if (el.classList.contains('contents') && el.querySelector('[data-testid="math-block-layout-content"]')) {
+    return 'learning-viz'; // not working for now. need to implement.
+  }
   if (el.classList.contains('math-block')) return 'math-block';
   if (el.classList.contains('math-display')) return 'math-display';
   if (el.classList.contains('math-inline')) return 'math-inline';
-  const dataMath = (el.getAttribute('data-math') || '').trim();
+  const dataMath = (el.getAttribute('data-math') || el.getAttribute('data-math-source') || '').trim();
   if (dataMath) {
+    if (tag === 'span' && (el as HTMLElement).style.display === 'block') return 'math-block';
     if (tag === 'span') return 'math-inline';
     if (tag === 'div') return 'math-block';
   }
@@ -144,12 +162,12 @@ function normalizeMathElementType(tag: string, node: Node): string {
 
 /** `data-math`가 없을 때 KaTeX MathML annotation에서 LaTeX 소스를 복구 */
 function augmentKatexFromAnnotation(el: Element, mdNode: MdNode): void {
-  if ((mdNode.attributes['data-math'] || '').trim()) return;
+  if ((mdNode.attributes['data-math'] || mdNode.attributes['data-math-source'] || '').trim()) return;
   if (!el.classList.contains('katex')) return;
   const ann = el.querySelector('annotation[encoding="application/x-tex"]');
   const tex = ann?.textContent?.trim();
   if (!tex) return;
-  mdNode.attributes['data-math'] = tex;
+  mdNode.attributes['data-math'] = mdNode.attributes['data-math-source'] || tex;
   const isDisplay =
     el.classList.contains('katex-display') ||
     Boolean(el.parentElement?.classList.contains('katex-display'));
@@ -231,23 +249,38 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
             newMdNode.attributes[attr.name] = attr.value;
           }
         }
+
+        if (rawTag === 'pre') {
+          // only for chatGPT, consider same as `code` tag.
+          let divs = (el as HTMLElement).querySelectorAll(`.cm-content .cm-line`);
+          if (divs.length > 0) {
+            let raw = Array.from(divs).map((div) => (div as HTMLElement).textContent).join('\n');
+            newMdNode.attributes['__codeText__'] = raw;
+            newMdNode.text = raw;
+          }
+        }
+
+
         if (rawTag === 'code') {
           let t = (el as HTMLElement).textContent ?? '';
           t = t.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
           newMdNode.attributes['__codeText__'] = t;
         }
+        
+
         newMdNode.type = normalizeMathElementType(rawTag, child);
         augmentKatexFromAnnotation(el, newMdNode);
       }
 
       mdNode.children.push(newMdNode);
-      const mathFromAttr = (newMdNode.attributes['data-math'] || '').trim();
+      const mathFromAttr = (newMdNode.attributes['data-math'] || newMdNode.attributes['data-math-source'] || '').trim();
       const skipMathChildren =
         mathFromAttr &&
         (newMdNode.type === 'math-block' ||
           newMdNode.type === 'math-display' ||
-          newMdNode.type === 'math-inline');
-      if (!skipMathChildren) {
+          newMdNode.type === 'math-inline' ||
+          newMdNode.type === 'learning-viz');
+      if (!skipMathChildren || newMdNode.type === 'code') {
         queue.push({ domNode: child, mdNode: newMdNode });
       }
     });
@@ -357,13 +390,19 @@ function renderMdTree(
     }
     case 'br':
       return inTableCell ? ' ' : `\n`;
-    case 'pre':
+    case 'hr':
+      return inTableCell ? ' ' : `\n---\n`;
+    case 'pre':{
+      if (node.attributes['__codeText__']) {
+        return `\n\`\`\`\n${node.attributes['__codeText__']}\n\`\`\`\n`;
+      }
       return `\n\`\`\`\n${childContent}\n\`\`\`\n`;
+    }
     case 'th':
     case 'td':
       return childContent.trim();
     case 'math-inline': {
-      let inlineLatex = node.attributes['data-math'] || '';
+      let inlineLatex = node.attributes['data-math'] || node.attributes['data-math-source'] || '';
       if (inlineLatex.trim()) {
         inlineLatex = inlineLatex.replace(/([가-힣ㄱ-ㅎ]) ([가-힣ㄱ-ㅎ])/g, '$1\\ $2');
         return `$${inlineLatex}$`;
@@ -372,10 +411,18 @@ function renderMdTree(
     }
     case 'math-block':
     case 'math-display': {
-      let blockLatex = node.attributes['data-math'] || '';
+      let blockLatex = node.attributes['data-math'] || node.attributes['data-math-source'] || '';
       if (blockLatex.trim()) {
         blockLatex = blockLatex.replace(/([가-힣ㄱ-ㅎ]) ([가-힣ㄱ-ㅎ])/g, '$1\\ $2');
         return `\n$$\n${blockLatex}\n$$\n`;
+      }
+      return '';
+    }
+    case 'learning-viz': {
+      let blockLatex = node.attributes['data-math'] || node.attributes['data-math-source'] || '';
+      if (blockLatex.trim()) {
+        blockLatex = blockLatex.replace(/([가-힣ㄱ-ㅎ]) ([가-힣ㄱ-ㅎ])/g, '$1\\ $2');
+        return `\n<!-- learning_viz -->\n$$\n${blockLatex}\n$$\n`;
       }
       return '';
     }

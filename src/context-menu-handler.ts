@@ -6,6 +6,7 @@ import {
   isExtensionContextValid,
   startSelectionReadableWatcher,
 } from './notify-selection-readable.ts';
+import { showCopyFeedback } from './toasts.ts';
 
 /** 선택 영역 HTML을 읽을 수 있는지 검사 (canvas, shadow DOM 등 비읽기 영역 제외) */
 function isSelectionReadable(): boolean {
@@ -24,26 +25,7 @@ function isSelectionReadable(): boolean {
 
 startSelectionReadableWatcher(isSelectionReadable);
 
-function showCopyFeedback(): void {
-  const toast = document.createElement('div');
-  toast.textContent = 'Copied as Markdown!';
-  Object.assign(toast.style, {
-    position: 'fixed',
-    bottom: '24px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    padding: '8px 16px',
-    background: '#333',
-    color: '#fff',
-    borderRadius: '8px',
-    fontSize: '14px',
-    zIndex: '2147483647',
-    fontFamily: 'system-ui, sans-serif',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-  });
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 1500);
-}
+
 
 chrome.runtime.onMessage.addListener(
   (

@@ -31,6 +31,8 @@ const COPY_EXCLUDE = uniqueArray([
   'citation-mode.ts',
   'html-to-markdown.ts',
   'html2md.jsx',
+  'chatGPT-fix-copyButton.ts',
+  'chatGPT-fix-copyButton.js',
 ]);
 
 function buildScripts() {
@@ -44,6 +46,7 @@ function buildScripts() {
     ['notebooklm-content.ts', 'notebooklm-content.js'],
     ['notebooklm-context-menu-handler.ts', 'notebooklm-context-menu-handler.js'],
     ['popup.ts', 'popup.js'],
+    ['chatGPT-fix-copyButton.ts', 'chatGPT-fix-copyButton.js'],
   ];
   for (const [src, out] of scripts) {
     const result = spawnSync('bun', ['build', join(srcDir, src), '--outdir', distDir], {

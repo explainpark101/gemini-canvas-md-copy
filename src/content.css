@@ -1,22 +1,21 @@
 #custom-floating-copy-btn {
     position: fixed;
     z-index: 999999;
-    background-color: #007bff;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
     color: white;
     border: none;
-    border-radius: 20px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
     user-select: none;
     touch-action: none;
-    display: none;
     opacity: 0;
     transform: scale(0.5);
     pointer-events: none;
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    overflow: hidden;
 }
 
 #custom-floating-copy-btn.visible {
@@ -30,9 +29,21 @@
     transition: transform 0.1s;
 }
 
-#custom-floating-copy-btn button {
-    padding: 10px 20px;
-    width: 150px;
+#custom-floating-copy-btn.menu-open.visible:active {
+    transform: scale(1);
+}
+
+#custom-floating-copy-btn .fab-main {
+    display: flex;
+    align-items: stretch;
+    background-color: #007bff;
+    border-radius: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+#custom-floating-copy-btn .fab-copy,
+#custom-floating-copy-btn .fab-menu-toggle {
     background: transparent;
     color: white;
     border: none;
@@ -40,8 +51,129 @@
     font-size: 14px;
     font-weight: bold;
     outline: none;
+    padding: 10px 16px;
 }
 
-#custom-floating-copy-btn button:hover {
-    background-color: rgba(255,255,255,0.15);
+#custom-floating-copy-btn .fab-copy {
+    min-width: 132px;
+    border-right: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+#custom-floating-copy-btn .fab-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+}
+
+#custom-floating-copy-btn .fab-copy:hover,
+#custom-floating-copy-btn .fab-menu-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+#custom-floating-copy-btn .fab-chevron {
+    display: block;
+    transition: transform 0.15s ease;
+}
+
+#custom-floating-copy-btn.menu-open .fab-chevron {
+    transform: rotate(180deg);
+}
+
+#custom-floating-copy-btn .fab-menu {
+    position: absolute;
+    min-width: 180px;
+    padding: 6px;
+    border-radius: 12px;
+    background: #fff;
+    color: #1a1d23;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    z-index: 1;
+}
+
+/* Vertical: open toward viewport center (50vh) */
+#custom-floating-copy-btn.menu-up .fab-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+}
+
+#custom-floating-copy-btn.menu-down .fab-menu {
+    bottom: auto;
+    top: calc(100% + 8px);
+}
+
+/* Horizontal: open toward viewport center (50vw) */
+#custom-floating-copy-btn.menu-left .fab-menu {
+    left: auto;
+    right: 0;
+}
+
+#custom-floating-copy-btn.menu-right .fab-menu {
+    right: auto;
+    left: 0;
+}
+
+#custom-floating-copy-btn .fab-menu[hidden] {
+    display: none !important;
+}
+
+#custom-floating-copy-btn .fab-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#custom-floating-copy-btn .fab-menu-item:hover {
+    background: #e8f0fe;
+}
+
+#custom-floating-copy-btn .fab-menu-item.is-selected {
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+#custom-floating-copy-btn .fab-menu-item.is-selected::after {
+    content: " ✓";
+}
+
+
+[data-testid="copy-turn-action-button-md"]:hover::before {
+    position: relative; /* 기준점 설정 */
+}
+
+/* 브라우저 기본 툴팁 중복 방지를 위한 data-tooltip 권장 또는 아래 스타일 적용 */
+[data-testid="copy-turn-action-button-md"]:hover::before {
+    content: attr(title);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 6px; /* 대상 요소와의 간격 추가 */
+    
+    background-color: #333;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    
+    z-index: 1000; /* 다른 요소 위에 표시 */
+    pointer-events: none; /* 마우스 이벤트 간섭 방지 */
+    
+    /* 자연스러운 등장 애니메이션 (선택 사항) */
+    opacity: 0;
+    animation: fadeIn 0.2s forwards;
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
 }
