@@ -86,4 +86,11 @@ const waitUntilLoaded = async (selector: string) : Promise<Element> => {
     assistantMessages.forEach((assistantMessage) => {
         addCopyButton(assistantMessage);
     });
+
+    setInterval(() => {
+        const assistantMessages = observeTarget.querySelectorAll(assistantSectionSelector);
+        assistantMessages.forEach((assistantMessage) => {
+            addCopyButton(assistantMessage);
+        });
+    }, 1000);
 })();

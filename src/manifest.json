@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Canvas Markdown Copy",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구. 선택해서 복사하기는 ChatGPT도 지원함.",
   "icons": {
     "16": "icon-16.png",
