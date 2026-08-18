@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini Canvas Markdown Copy",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Gemini의 응답들을 Markdown으로 복사하기 위한 도구. 선택해서 복사하기는 ChatGPT도 지원함.",
   "icons": {
     "16": "icon-16.png",
@@ -53,7 +53,7 @@
     },
     {
       "matches": ["https://chatgpt.com/*"],
-      "js": ["chatGPT-fix-copyButton.js"],
+      "js": ["chatGPT-fix-copyButton.js", "chatgpt-content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

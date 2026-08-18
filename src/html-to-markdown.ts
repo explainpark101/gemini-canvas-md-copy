@@ -2,7 +2,7 @@
  * HTML을 Markdown으로 변환하는 공유 유틸리티 (BFS 트리 파싱 + renderMdTree)
  */
 
-import type { CitationMode } from './citation-mode.ts';
+import type { CitationMode } from './gemini/citation-mode.ts';
 
 export interface HtmlToMarkdownOptions {
   citationMode?: CitationMode;
@@ -321,6 +321,22 @@ function renderMdTree(
     return `\`${escaped}\``;
   }
 
+  if (node.type === 'blockquote') {
+
+    const raw_contents: string[] = node.children
+      .map(c=>renderMdTree(c))
+      .join('').split('\n');
+
+    let starting_idx = 0, ending_idx = raw_contents.length;
+    for (;raw_contents[starting_idx]?.trim() == ''; starting_idx++);
+    for (;raw_contents[ending_idx-1]?.trim() == ''; ending_idx--);
+
+    return "\n"+raw_contents.slice(starting_idx, ending_idx)
+      .map(line=>`> ${line}`)
+      .join('\n')+"\n";
+    
+  }
+
   const nextDepth = node.type === 'li' ? depth + 1 : depth;
   const passTableCell = inTableCell || node.type === 'th' || node.type === 'td';
   let childContent: string;
@@ -335,7 +351,8 @@ function renderMdTree(
         return renderMdTree(child, nextDepth, node.type, passTableCell);
       })
       .join('');
-  } else {
+  } 
+  else {
     childContent = node.children
       .map((child) => renderMdTree(child, nextDepth, node.type, passTableCell))
       .join('');
@@ -350,6 +367,8 @@ function renderMdTree(
       return `\n### ${childContent}\n\n`;
     case 'h4':
       return `\n#### ${childContent}\n\n`;
+    case 'blockquote':
+      return `\n> ${childContent}\n\n`;
     case 'p':
       if (inTableCell) {
         return childContent.trim();
