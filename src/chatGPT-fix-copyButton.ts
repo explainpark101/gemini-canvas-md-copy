@@ -38,7 +38,7 @@ const waitUntilLoaded = async (selector: string) : Promise<Element> => {
 
 (async () => {
     
-    const observeTarget = await waitUntilLoaded(`.contents main #thread div:has(>[data-turn-id-container])`)
+    const observeTarget = document.body;
     
     const addCopyButton = (assistantMessage: Element) => {
         const newCopyButton = document.createElement('button');
@@ -80,7 +80,7 @@ const waitUntilLoaded = async (selector: string) : Promise<Element> => {
       });
     });
     
-    observer.observe(observeTarget, { childList: true });
+    observer.observe(observeTarget, { childList: true, subtree: true });
     
     const assistantMessages = observeTarget.querySelectorAll(assistantSectionSelector);
     assistantMessages.forEach((assistantMessage) => {
