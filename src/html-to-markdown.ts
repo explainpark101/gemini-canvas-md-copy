@@ -251,22 +251,22 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
         }
 
         if (rawTag === 'pre') {
-          // only for chatGPT, consider same as `code` tag.
-          let divs = (el as HTMLElement).querySelectorAll(`.cm-content .cm-line`);
-          if (divs.length > 0) {
-            let raw = Array.from(divs).map((div) => (div as HTMLElement).textContent).join('\n');
+          // ChatGPT CodeMirror: flatten .cm-line text so nested cm-* / pre do not fence twice.
+          const cmLines = (el as HTMLElement).querySelectorAll('.cm-line');
+          if (cmLines.length > 0) {
+            const raw = Array.from(cmLines)
+              .map((div) => (div as HTMLElement).textContent ?? '')
+              .join('\n');
             newMdNode.attributes['__codeText__'] = raw;
             newMdNode.text = raw;
           }
         }
-
 
         if (rawTag === 'code') {
           let t = (el as HTMLElement).textContent ?? '';
           t = t.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
           newMdNode.attributes['__codeText__'] = t;
         }
-        
 
         newMdNode.type = normalizeMathElementType(rawTag, child);
         augmentKatexFromAnnotation(el, newMdNode);
@@ -280,7 +280,10 @@ function parseHtmlToMarkdownBfs(htmlString: string): string {
           newMdNode.type === 'math-display' ||
           newMdNode.type === 'math-inline' ||
           newMdNode.type === 'learning-viz');
-      if (!skipMathChildren || newMdNode.type === 'code') {
+      // Already flattened CodeMirror lines onto the pre — do not walk nested cm-* / pre.
+      const skipPreChildren =
+        newMdNode.type === 'pre' && newMdNode.attributes['__codeText__'] !== undefined;
+      if ((!skipMathChildren || newMdNode.type === 'code') && !skipPreChildren) {
         queue.push({ domNode: child, mdNode: newMdNode });
       }
     });
@@ -295,9 +298,10 @@ function renderMdTree(
   parentType: string | null = null,
   inTableCell = false,
   olLiIndex?: number,
+  inPre = false,
 ): string {
   if (node.type === '#text') {
-    if (parentType === 'pre') {
+    if (parentType === 'pre' || inPre) {
       return node.text.replace(/\r\n/g, '\n');
     }
     return node.text.replace(/\s+/g, ' ');
@@ -310,11 +314,13 @@ function renderMdTree(
   if (node.type === 'code') {
     let raw = node.attributes['__codeText__'];
     if (raw === undefined) {
-      raw = node.children.map((c) => renderMdTree(c, depth, 'code', inTableCell)).join('');
+      raw = node.children
+        .map((c) => renderMdTree(c, depth, 'code', inTableCell, undefined, inPre))
+        .join('');
     } else {
       raw = raw.replace(/\r\n/g, '\n').replace(/\\n/g, '\n');
     }
-    if (parentType === 'pre') {
+    if (parentType === 'pre' || inPre) {
       return raw;
     }
     const escaped = raw.replace(/`/g, '\\`');
@@ -337,6 +343,22 @@ function renderMdTree(
     
   }
 
+  // Nested pre (possibly under wrappers like div) must not open another fence.
+  if (node.type === 'pre') {
+    let body: string;
+    if (node.attributes['__codeText__'] !== undefined) {
+      body = node.attributes['__codeText__']!;
+    } else {
+      body = node.children
+        .map((child) => renderMdTree(child, depth, 'pre', inTableCell, undefined, true))
+        .join('');
+    }
+    if (inPre) {
+      return body;
+    }
+    return `\n\`\`\`\n${body}\n\`\`\`\n`;
+  }
+
   const nextDepth = node.type === 'li' ? depth + 1 : depth;
   const passTableCell = inTableCell || node.type === 'th' || node.type === 'td';
   let childContent: string;
@@ -346,15 +368,15 @@ function renderMdTree(
       .map((child) => {
         if (child.type === 'li') {
           liOrdinal += 1;
-          return renderMdTree(child, nextDepth, node.type, passTableCell, liOrdinal);
+          return renderMdTree(child, nextDepth, node.type, passTableCell, liOrdinal, inPre);
         }
-        return renderMdTree(child, nextDepth, node.type, passTableCell);
+        return renderMdTree(child, nextDepth, node.type, passTableCell, undefined, inPre);
       })
       .join('');
   } 
   else {
     childContent = node.children
-      .map((child) => renderMdTree(child, nextDepth, node.type, passTableCell))
+      .map((child) => renderMdTree(child, nextDepth, node.type, passTableCell, undefined, inPre))
       .join('');
   }
 
@@ -411,12 +433,6 @@ function renderMdTree(
       return inTableCell ? ' ' : `\n`;
     case 'hr':
       return inTableCell ? ' ' : `\n---\n`;
-    case 'pre':{
-      if (node.attributes['__codeText__']) {
-        return `\n\`\`\`\n${node.attributes['__codeText__']}\n\`\`\`\n`;
-      }
-      return `\n\`\`\`\n${childContent}\n\`\`\`\n`;
-    }
     case 'th':
     case 'td':
       return childContent.trim();
