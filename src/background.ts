@@ -51,10 +51,12 @@ function registerContextMenus(): void {
       visible: false,
     });
 
+    // Omit 'selection' so this item is hidden when text is selected
+    // (selection context then shows only "Copy selection as Markdown").
     chrome.contextMenus.create({
       id: OPEN_CITATION_MODE_MENU_ID,
       title: '출처 복사 모드 설정',
-      contexts: ['page', 'selection', 'editable'],
+      contexts: ['page', 'editable'],
       documentUrlPatterns: GEMINI_URL_PATTERNS,
     });
   });

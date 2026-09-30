@@ -2,7 +2,7 @@
  * HTML을 Markdown으로 변환하는 공유 유틸리티 (BFS 트리 파싱 + renderMdTree)
  */
 
-import type { CitationMode } from './gemini/citation-mode.ts';
+import type { CitationMode } from './citation-mode.ts';
 
 export interface HtmlToMarkdownOptions {
   citationMode?: CitationMode;
@@ -105,6 +105,26 @@ function stripSourcesCarouselInline(root: HTMLElement): void {
   root
     .querySelectorAll('sources-carousel-inline, .sources-carousel-inline')
     .forEach((el) => el.remove());
+}
+
+/**
+ * Gemini code blocks: `div.header-formatted` immediately before `pre` holds the
+ * language label. Move it onto the following `pre` as `data-md-lang` (lowercase)
+ * and remove the header so it is not emitted as plain text.
+ */
+function applyCodeBlockLanguagesFromHeaders(root: HTMLElement): void {
+  const headers = Array.from(
+    root.querySelectorAll('div.header-formatted:has(+ pre)'),
+  );
+  for (const header of headers) {
+    const pre = header.nextElementSibling;
+    if (!pre || pre.tagName.toLowerCase() !== 'pre') continue;
+    const lang = (header.textContent || '').trim().toLowerCase();
+    if (lang) {
+      pre.setAttribute('data-md-lang', lang);
+    }
+    header.remove();
+  }
 }
 
 /**
@@ -356,7 +376,9 @@ function renderMdTree(
     if (inPre) {
       return body;
     }
-    return `\n\`\`\`\n${body}\n\`\`\`\n`;
+    const lang = (node.attributes['data-md-lang'] || '').trim().toLowerCase();
+    const fence = lang ? `\`\`\`${lang}` : '```';
+    return `\n${fence}\n${body}\n\`\`\`\n`;
   }
 
   const nextDepth = node.type === 'li' ? depth + 1 : depth;
@@ -632,6 +654,7 @@ export function htmlToMarkdown(html: string, options: HtmlToMarkdownOptions = {}
 
   // Remove carousel UI before citation conversion so chip/label noise never enters markdown.
   stripSourcesCarouselInline(body);
+  applyCodeBlockLanguagesFromHeaders(body);
 
   if (citationMode === 'footnote' || citationMode === 'linkFootnote') {
     convertSourceFootnotesToMarkers(body);
